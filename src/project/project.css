@@ -1,0 +1,76 @@
+.slidev-jianpu-blank {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: 86px minmax(0, 1fr) 132px;
+  overflow: hidden;
+  background: #f3f6f8;
+  color: #0c151d;
+  font-family: var(--header-font-family);
+}
+
+.slidev-jianpu-blank header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #d3dde5;
+  background: #fbfcfe;
+  padding: 0 42px;
+}
+
+.slidev-jianpu-blank header span {
+  color: #007fa8;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.slidev-jianpu-blank header strong {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.slidev-jianpu-blank header > div {
+  display: grid;
+  gap: 4px;
+  text-align: right;
+}
+
+.slidev-jianpu-blank header small {
+  color: #607487;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.slidev-jianpu-blank main {
+  display: grid;
+  align-content: center;
+  gap: 16px;
+  padding: 48px;
+}
+
+.slidev-blank-lyric,
+.slidev-blank-reading {
+  margin: 0;
+  text-align: center;
+}
+
+.slidev-blank-lyric {
+  font-size: 52px;
+  font-weight: 900;
+}
+
+.slidev-blank-reading {
+  color: #607487;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.slidev-jianpu-blank footer {
+  border-top: 1px solid #d3dde5;
+  color: #526170;
+  padding: 28px 44px;
+  font-size: 20px;
+  font-weight: 650;
+}

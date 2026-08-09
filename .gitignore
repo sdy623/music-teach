@@ -1,0 +1,31 @@
+node_modules/
+dist/
+dist-lib/
+artifacts/
+output/
+extracted_fonts/
+safari_tabs_export/
+vendor/*
+!vendor/sparks-notation-1/
+!vendor/sparks-notation-1/**
+tools/
+tmp/
+.playwright-cli/
+run_safari_tabs_export.bat
+
+*.log
+*.tmp
+*.temp
+*.tsbuildinfo
+__pycache__/
+*.pyc
+
+.DS_Store
+Thumbs.db
+
+# Large local OCR/runtime assets. Keep acquisition documented instead of committing.
+*.traineddata
+
+# Local experiment scratch files.
+tmp_*.py
+dev-server*.log

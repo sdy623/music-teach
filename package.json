@@ -1,0 +1,48 @@
+{
+  "name": "music-teach",
+  "description": "Vue 3 and SVG components for phrase-by-phrase music teaching, with JPW-ABC import and jianpu rendering.",
+  "private": true,
+  "version": "0.1.0",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vue-tsc -b && vite build",
+    "build:lib": "vite build --config vite.lib.config.ts && vue-tsc -p tsconfig.lib.json",
+    "glyphs:extract": "node scripts/extract-score-glyphs.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "jquery": "^4.0.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@types/jquery": "^4.0.0",
+    "@types/node": "^22.15.3",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "@vue/test-utils": "^2.4.6",
+    "jsdom": "^25.0.1",
+    "opentype.js": "^2.0.0",
+    "typescript": "^5.8.3",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10",
+    "vue-tsc": "^2.2.10"
+  },
+  "files": [
+    "dist-lib"
+  ],
+  "module": "./dist-lib/music-teach.js",
+  "types": "./dist-lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist-lib/types/index.d.ts",
+      "import": "./dist-lib/music-teach.js"
+    },
+    "./style.css": "./dist-lib/music-teach.css"
+  }
+}

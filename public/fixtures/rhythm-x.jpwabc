@@ -1,0 +1,26 @@
+.Options
+Paper = 210, 297, 18, 18, 16, 16
+
+.Fonts
+
+.Title
+Intro = Rhythm lane
+Title = {Rhythm X}
+SubTitle = chant / rap-like lyric alignment
+SubTitle2 =
+KeyAndMeters = {4/4}
+WordsByAndMusicBy =
+Expression = Spoken
+LinePos = 0.0, 0.0, 16.0, 23.0, 16.0, 16.0, 20.0
+
+.Voice
+4/4 | X X X X | X_ X_ X X | X. X X__ X__ ||
+
+.Words
+W1@1,1:
+ラ プ ビ ー ト/한 글 리 듬/た た た た
+
+.Attachments
+
+.Page
+

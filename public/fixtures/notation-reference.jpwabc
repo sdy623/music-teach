@@ -1,0 +1,31 @@
+.Options
+Paper = 210, 297, 18, 18, 16, 16
+HorzSpacing_Gap = 0.00, 1.00, 0.70, 1.00, 0.50
+HorzSpacing_AW = 16th, 1.30, 0.60
+
+.Fonts
+
+.Title
+Intro = Publishing examples
+Title = {简谱记号规范}
+SubTitle = JPW / SMuFL visual reference
+SubTitle2 =
+KeyAndMeters = {1=bE,6/8}
+WordsByAndMusicBy =
+Expression = {J=96 清晰}
+LinePos = 0.0, 0.0, 16.0, 23.0, 16.0, 16.0, 20.0
+
+.Voice
+6/8 |: #1g_. 2g__ 3g_ 4g_ 5g_ 6g_ :|
+(1g_ 1g_) 1g- |
+1_ 0_ 0__ X__ X_ 6d__ 7d__ 2_ ||
+4/4 {(3}5_ 6_ 5_ b3__ #b3__ 2__ 1__ |]
+1dd___ 2___ 3___ 4___ 5___ 6___ 7___ 1g___ |
+
+.Words
+W1@1,1:
+あいうえおか/きーー/リズムを確認/さんれんおわり/みじかいせんみる
+
+.Attachments
+
+.Page
