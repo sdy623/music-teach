@@ -1,3 +1,5 @@
+import type { JianpuPhraseFrame } from "../slide/types";
+
 export type SongSectionId =
   | "A"
   | "B"
@@ -44,6 +46,25 @@ export interface TeachingSectionBreak {
   section: SectionId;
 }
 
+export interface TeachingProjectLyricCell {
+  id: string;
+  kind: "syllable" | "multiChar" | "extension" | "space";
+  raw: string;
+  display: string;
+  normalizedText: string;
+  tokenId?: string;
+  inheritedTokenId?: string;
+  slotIndex?: number;
+}
+
+export interface TeachingProjectKeyChange {
+  id: string;
+  slotIndex: number;
+  keyOfOne: string;
+  display: string;
+  semitoneShift?: number;
+}
+
 export interface TeachingProjectPhrase {
   id: string;
   lyricText: string;
@@ -51,14 +72,22 @@ export interface TeachingProjectPhrase {
   morphology: MorphologyToken[];
   kind: TeachingPhraseKind;
   voiceLine: string;
+  lyricJpwabc: string;
+  lyricCells: TeachingProjectLyricCell[];
+  keyOfOne: string;
+  keyChanges: TeachingProjectKeyChange[];
+  /** Exact rendered music frame used for lossless project round trips. */
+  frame?: JianpuPhraseFrame;
   annotation: string;
   showMetronome: boolean;
   skipDuringPlayback: boolean;
 }
 
 export interface TeachingProject {
+  formatVersion: 3;
   id: string;
   title: string;
+  tags: string[];
   artist: string;
   lyricist: string;
   composer: string;

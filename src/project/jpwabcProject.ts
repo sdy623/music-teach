@@ -5,8 +5,13 @@ import type { VoiceEvent } from "../ir/voice";
 import { parseJPWABC } from "../parser/parseJPWABC";
 import { displayTitleText } from "../parser/parseTitle";
 import { buildLessonDeck } from "../slide/buildLessonDeck";
-import type { JianpuPhraseFrame } from "../slide/types";
-import { createProjectPhrase, createTeachingProject } from "./projectBuilder";
+import { buildTeachingRubyTokens } from "../slide/teachingPresentation";
+import type { JianpuLessonDeck, JianpuPhraseFrame } from "../slide/types";
+import {
+  analyzeJapaneseReference,
+  createProjectPhrase,
+  createTeachingProject
+} from "./projectBuilder";
 import type { TeachingProject, TeachingProjectPhrase } from "./types";
 
 export interface JPWABCProjectConversion {
@@ -30,11 +35,14 @@ export function convertJPWABCToTeachingProject(
 
 export function convertParsedScoreToTeachingProject(
   score: ScoreIR,
-  projectId?: string
+  projectId?: string,
+  deckOverride?: JianpuLessonDeck
 ): Omit<JPWABCProjectConversion, "encoding"> {
-  const deck = buildLessonDeck(score, { id: projectId });
+  const deck = deckOverride ?? buildLessonDeck(score, { id: projectId });
   const voice = score.voices[0];
-  const timelineFrames = buildTrackOrderedFrames(score, projectId);
+  const timelineFrames = deckOverride
+    ? deck.phrases
+    : buildTrackOrderedFrames(score, projectId);
   const phrases = timelineFrames.map((phrase, index) =>
     phraseToProjectPhrase(phrase, index, voice?.events ?? [])
   );
@@ -61,6 +69,7 @@ export function convertParsedScoreToTeachingProject(
   const project = createTeachingProject(deck.title, sourceLyrics);
   project.id = slugify(projectId || deck.id);
   project.title = deck.title;
+  project.tags = deck.tags ?? [];
   project.artist = credits.artist;
   project.lyricist = credits.lyricist;
   project.composer = credits.composer;
@@ -104,10 +113,84 @@ function phraseToProjectPhrase(
   index: number,
   events: VoiceEvent[]
 ): TeachingProjectPhrase {
-  const result = createProjectPhrase(phrase.lyricText, index);
+  const kind = phrase.kind ?? "vocal";
+  const originalText = kind === "instrumental"
+    ? ""
+    : phrase.teaching?.originalText ??
+      phrase.teaching?.surface ??
+      phrase.lyricText;
+  const referenceReading = kind === "instrumental"
+    ? ""
+    : phrase.teaching?.reading || phrase.lyricText;
+  const result = createProjectPhrase(originalText, index);
   result.id = `project-phrase-${index + 1}`;
+  result.kind = kind;
+  result.referenceReading = referenceReading;
+  result.morphology = morphologyForPhrase(
+    originalText,
+    referenceReading,
+    phrase.teaching?.rubyTokens ?? []
+  );
   result.voiceLine = voiceLineForPhrase(phrase, events);
+  result.lyricJpwabc = phrase.lyricCells.map((cell) => cell.raw).join("");
+  result.lyricCells = phrase.lyricCells.map((cell) => {
+    const slotIndex = phrase.slots.findIndex((slot) => slot.eventId === cell.eventId);
+    return {
+      id: cell.id,
+      kind: cell.kind,
+      raw: cell.raw,
+      display: cell.display,
+      normalizedText: cell.normalizedText,
+      tokenId: cell.tokenId,
+      inheritedTokenId: cell.inheritedTokenId,
+      slotIndex: slotIndex >= 0 ? slotIndex : undefined
+    };
+  });
+  result.keyOfOne = phrase.keyOfOne;
+  result.keyChanges = phrase.keyChanges.flatMap((change) => {
+    const slotIndex = phrase.slots.findIndex((slot) => slot.eventId === change.eventId);
+    return slotIndex >= 0
+      ? [{
+          id: change.id,
+          slotIndex,
+          keyOfOne: change.keyOfOne,
+          display: change.display,
+          semitoneShift: change.semitoneShift
+        }]
+      : [];
+  });
+  result.frame = snapshotPhraseFrame(phrase);
+  if (result.kind === "instrumental") {
+    result.annotation = phrase.teaching?.coachNote ?? "原曲同步过门";
+    result.skipDuringPlayback = false;
+  }
   return result;
+}
+
+function morphologyForPhrase(
+  originalText: string,
+  referenceReading: string,
+  explicitTokens: NonNullable<JianpuPhraseFrame["teaching"]>["rubyTokens"]
+): TeachingProjectPhrase["morphology"] {
+  if (!originalText) return [];
+  const rubyTokens = buildTeachingRubyTokens(
+    originalText,
+    referenceReading,
+    explicitTokens ?? []
+  );
+  if (rubyTokens.some((token) => token.reading)) {
+    return rubyTokens.map((token, index) => ({
+      id: token.id || `morph-${index + 1}`,
+      surface: token.surface,
+      reading: token.reading ?? "",
+      needsReview: false
+    }));
+  }
+  return analyzeJapaneseReference(originalText).tokens;
+}
+
+function snapshotPhraseFrame(frame: JianpuPhraseFrame): JianpuPhraseFrame {
+  return JSON.parse(JSON.stringify(frame)) as JianpuPhraseFrame;
 }
 
 function voiceLineForPhrase(

@@ -8,6 +8,8 @@ JPW-ABC is the current first-class score import adapter and jianpu is the first 
 
 The repository intentionally ships only a public-domain folk-song demo and synthetic notation fixtures. Bring other repertoire in as local JPW-ABC files or exported teaching-project JSON; song files are content, not library source.
 
+Version 0.2.0 adds lossless teaching-project JSON round trips, phrase-level JPW-ABC editing, title credits and tags, full-song section progress, beat-accurate playback scheduling, word-level ruby data, and direct export from the phrase player.
+
 This project is aimed at music-teaching videos, classroom slides, and phrase-by-phrase practice tools. It is not a JP-Word clone: notation semantics are parsed into typed IR first, while the Vue components render a stable 16:9 teaching frame that a host application can highlight and control.
 
 ## Pipeline
@@ -39,7 +41,6 @@ Open `http://127.0.0.1:5173/scores/sakura`.
 - `/scores/notation-reference`: notation regression fixture
 - `/scores/rhythm-x`: pitchless rhythm fixture
 - `/projects/new`: create or import a teaching project
-- `/legacy/sakura`: print-oriented renderer
 
 ```bash
 npm run test
@@ -56,7 +57,7 @@ Use **New teaching project** to import either:
 - a `.jpwabc` file, converted into an editable teaching project; or
 - a `.teaching-project.json` file previously exported by the studio.
 
-Project JSON keeps metadata, source lyrics, phrase-level JPW-ABC, annotations, playback flags, and section split points. Keep licensed or private repertoire outside the repository and import it locally when needed.
+Project JSON keeps metadata, tags, original lyrics, readings, morphology/ruby data, phrase-level JPW-ABC, aligned lyric cells, key changes, rendered phrase snapshots, instrumental passages, annotations, playback flags, and section split points. Exporting and importing the same project preserves the teaching timeline. Keep licensed or private repertoire outside the repository and import it locally when needed.
 
 ## Vue Usage
 
@@ -119,7 +120,7 @@ Slidev integration is documented in [English](docs/slidev-integration.md) and [ç
 - Chords, grace-note detail, complex attachments, and multiple voices are incomplete.
 - Automatic linguistic analysis is intentionally outside the notation core.
 - `StaffRenderer` remains a placeholder.
-- The package remains marked `private` until a release name and version are chosen.
+- npm registry publishing is disabled; supported source releases are published on GitHub.
 
 ## Fixtures
 

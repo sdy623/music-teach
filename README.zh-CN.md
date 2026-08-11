@@ -10,6 +10,8 @@ JPW-ABC 是当前的一等乐谱输入适配器，简谱是第一套渲染器，
 
 仓库只附带公版民歌示例和人工合成的记谱测试样例。受许可约束或私人使用的曲目应作为本地 `.jpwabc`/教学工程 JSON 导入，不应作为组件库源码提交。
 
+`v0.2.0` 新增教学工程 JSON 无损往返、逐句 JPW-ABC 编辑、标题人员信息与标签、按段落绘制的全曲进度、按实际时值调度的播放、词级 ruby 数据，以及从乐句播放器直接导出工程。
+
 ## 处理管线
 
 ```text
@@ -41,7 +43,6 @@ npm run dev
 - `/scores/notation-reference`：记谱规范回归样例
 - `/scores/rhythm-x`：无音高节奏样例
 - `/projects/new`：新建或导入教学工程
-- `/legacy/sakura`：打印优先的旧渲染路径
 
 ```bash
 npm run test
@@ -56,7 +57,9 @@ npm run build:lib
 进入 **新建教学工程** 后可以导入：
 
 - `.jpwabc` 文件：自动解码、解析并转换为可编辑教学工程；
-- `.teaching-project.json` 或导出的 `.json`：恢复标题、人员信息、逐句简谱、注释、播放开关和段落分割点。
+- `.teaching-project.json` 或导出的 `.json`：恢复标题、人员信息、标签、歌词原文、读音与 ruby 数据、逐句简谱、歌词音位、转调、器乐过门、注释、播放开关和段落分割点。
+
+同一工程导出后再导入时，会保留渲染乐句快照和教学时间轴，不再重新猜测一字多音或句末休止。
 
 歌词按乐谱槽位对齐。`ー` 会消耗一个演唱槽位，但不会进入 `normalizedText`；花括号中的多个字符占用一个音位。未知符号会进入 diagnostics，而不是令整页崩溃。
 
@@ -123,7 +126,7 @@ Slidev 接入见 [中文教程](docs/slidev-integration.zh-CN.md) 或 [English g
 - 和弦、装饰音细节、复杂附件和多声部仍不完整。
 - 自动语言学分析不属于当前记谱核心。
 - `StaffRenderer` 仍是预留接口。
-- npm 包在确定正式名称和版本前仍标记为 `private`。
+- 暂不发布到 npm registry；正式源码版本通过 GitHub Releases 发布。
 
 ## 样例
 

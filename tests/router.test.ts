@@ -29,7 +29,7 @@ describe("SPA routes", () => {
     expect(router.currentRoute.value.name).toBe("project-new");
   });
 
-  it("migrates old query links into canonical SPA paths", async () => {
+  it("migrates query links and safely ignores removed legacy flags", async () => {
     const router = createAppRouter(createMemoryHistory());
 
     await router.push("/?score=rhythm-x&phrase=10");
@@ -37,6 +37,6 @@ describe("SPA routes", () => {
     expect(router.currentRoute.value.fullPath).toBe("/scores/rhythm-x/phrases/10");
 
     await router.push("/?score=sakura&legacy=1&edit=1");
-    expect(router.currentRoute.value.fullPath).toBe("/legacy/sakura/edit");
+    expect(router.currentRoute.value.fullPath).toBe("/scores/sakura");
   });
 });

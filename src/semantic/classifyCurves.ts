@@ -27,7 +27,8 @@ export function classifyCurves(voice: VoiceIR): Pick<SemanticInfo, "slurs"> & { 
       const open = stack.pop();
       const endNote = findPreviousNote(voice.events, index - 1);
       if (!open?.startNote || !endNote) {
-        diagnostics.push(warning("SLUR_UNMATCHED_END", "Ignored unmatched slur/phrase end marker.", describeMarker(voice.events, index)));
+        // JPW also uses ')' to close tuplets and instrumental phrase groups.
+        // Without an open slur this marker is semantically neutral.
         return;
       }
 

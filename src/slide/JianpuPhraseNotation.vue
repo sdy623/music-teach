@@ -65,7 +65,9 @@ function slotText(slot: PhraseSlot): string {
   return String(slot.degree ?? "");
 }
 
-function slotOpacity(slot: PhraseSlot): number {
+function slotOpacity(slot: PhraseSlot, index: number): number {
+  if (index === props.activeSlot) return 1;
+  if (slot.context) return 0.38;
   if (!props.teachingGhost || !slot.tieGhost) return 1;
   return 0.34;
 }
@@ -161,6 +163,7 @@ function keyShiftText(semitoneShift: number | undefined): string {
         :key="keyChange.change.id"
         :data-key-change-id="keyChange.change.id"
         :data-measure="keyChange.change.measure"
+        :data-note-index="keyChange.change.noteIndex"
       >
         <line
           class="phrase-key-change-rule"
@@ -192,7 +195,20 @@ function keyShiftText(semitoneShift: number | undefined): string {
 
     <g class="phrase-measures" aria-hidden="true">
       <g v-for="measure in geometry.measures" :key="measure.id">
-        <text v-if="measure.showNumber" class="phrase-measure-number" :x="measure.x + 4" y="53">{{ measure.number }}</text>
+        <text
+          v-if="measure.showNumber"
+          class="phrase-measure-number"
+          :data-incomplete-measure="measure.incomplete || undefined"
+          :x="measure.x + 4"
+          y="53"
+        >
+          <tspan>{{ measure.number }}</tspan>
+          <tspan
+            v-if="measure.incomplete"
+            class="phrase-measure-incomplete"
+            dx="5"
+          >未完整</tspan>
+        </text>
         <g v-if="measure.startingBarline" class="phrase-barline">
           <line
             v-for="stroke in barlineGlyphGeometry(measure.startingBarline).strokes"
@@ -273,6 +289,7 @@ function keyShiftText(semitoneShift: number | undefined): string {
         :class="{
           'is-active': slotGeometry.index === activeSlot,
           'is-ghost': slotGeometry.slot.tieGhost,
+          'is-context': slotGeometry.slot.context,
           'is-rhythm': slotGeometry.slot.kind === 'rhythm',
           'is-sustain': slotGeometry.slot.kind === 'sustain'
         }"
@@ -289,7 +306,7 @@ function keyShiftText(semitoneShift: number | undefined): string {
           width="50"
           height="162"
         />
-        <g class="phrase-slot-symbols" :style="{ opacity: slotOpacity(slotGeometry.slot) }">
+        <g class="phrase-slot-symbols" :style="{ opacity: slotOpacity(slotGeometry.slot, slotGeometry.index) }">
           <text
             v-if="accidentalText(slotGeometry.slot)"
             class="phrase-smufl phrase-accidental"

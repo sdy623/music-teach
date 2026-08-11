@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatKeyOfOneForDisplay, parseKeyAndMeterMarks, parseTempoExpression } from "../src/parser/parseTitle";
+import {
+  formatKeyOfOneForDisplay,
+  parseKeyAndMeterMarks,
+  parseTempoExpression,
+  parseTitleCredits
+} from "../src/parser/parseTitle";
 
 describe("parseTitle helpers", () => {
   it("parses JPW key and stacked-meter marks", () => {
@@ -17,5 +22,20 @@ describe("parseTitle helpers", () => {
       bpm: "73",
       expressionText: "深情地"
     });
+  });
+
+  it("parses nested JPW credit braces into songwriter and vocalist roles", () => {
+    expect(parseTitleCredits("{{山田太郎}词曲,{教学合唱团}演唱　}")).toEqual([
+      {
+        name: "山田太郎",
+        role: "lyrics-music",
+        roleLabel: "词曲"
+      },
+      {
+        name: "教学合唱团",
+        role: "vocals",
+        roleLabel: "演唱"
+      }
+    ]);
   });
 });

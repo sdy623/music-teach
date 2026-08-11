@@ -7,6 +7,7 @@ export { buildPhraseJPWABC, JpwLessonSlide, JpwPhraseLineRenderer, JpwTeachingRe
 export type { JapaneseGrammarMark, JapaneseVocabularyMark, JpwLessonPhrase, PhraseJPWABCParts, TeachingLineInfo } from "./teaching";
 export {
   buildLessonDeck,
+  buildTeachingRubyTokens,
   layoutPhrase,
   JianpuLessonSlide as JianpuVideoLessonSlide,
   JianpuPhraseNotation
@@ -23,7 +24,8 @@ export type {
   PhraseSplitRule,
   PhraseSlot,
   PhraseTeachingContent,
-  TeachingMark
+  TeachingMark,
+  TeachingRubyToken
 } from "./slide";
 export type { ScoreIR } from "./ir/score";
 export type { Diagnostic } from "./core/diagnostics";
@@ -37,8 +39,13 @@ export {
   convertParsedScoreToTeachingProject,
   createCustomSectionPreset,
   createTeachingProject,
+  deserializeTeachingProject,
+  downloadTeachingProject,
+  migrateTeachingProject,
   removeSectionBreak,
+  restoreProjectPhraseSemantics,
   resolvePhraseSection,
+  serializeTeachingProject,
   setSectionBreak,
   splitLyricsOnBlankLines,
   splitProjectPhrase
@@ -54,6 +61,8 @@ export type {
   SongSectionPreset,
   TeachingPhraseKind,
   TeachingProject,
+  TeachingProjectKeyChange,
+  TeachingProjectLyricCell,
   TeachingProjectPhrase,
   TeachingSectionBreak
 } from "./project";

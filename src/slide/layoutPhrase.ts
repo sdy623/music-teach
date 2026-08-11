@@ -41,6 +41,7 @@ export interface MeasureGeometry {
   width: number;
   endX: number;
   showNumber: boolean;
+  incomplete: boolean;
   startingBarline?: BarlineEvent["style"];
   endingBarline?: BarlineEvent["style"];
   meterChanged: boolean;
@@ -96,10 +97,11 @@ export function layoutPhrase(phrase: JianpuPhraseFrame, options: PhraseLayoutOpt
   const width = options.width ?? DEFAULT_WIDTH;
   const height = options.height ?? DEFAULT_HEIGHT;
   const contextWidth = options.contextWidth ?? DEFAULT_CONTEXT_WIDTH;
-  const left = contextWidth + 16;
-  const right = 30;
-  const beatGap = 8;
-  const measureGap = 10;
+  const compact = phrase.layoutDensity === "compact";
+  const left = contextWidth + (compact ? 30 : 16);
+  const right = compact ? 44 : 30;
+  const beatGap = compact ? 5 : 8;
+  const measureGap = compact ? 24 : 10;
   const flatBeats = phrase.measures.flatMap((measure) =>
     measure.beats.map((beat, beatIndex) => ({
       beat,
@@ -161,7 +163,7 @@ export function layoutPhrase(phrase: JianpuPhraseFrame, options: PhraseLayoutOpt
         beatWidth: beatGeometry.width
       };
     });
-    return resolveSlotCollisions(positioned, beatGeometry);
+    return resolveSlotCollisions(positioned, beatGeometry, compact);
   });
 
   const measures = phrase.measures.map((measure): MeasureGeometry => {
@@ -177,6 +179,7 @@ export function layoutPhrase(phrase: JianpuPhraseFrame, options: PhraseLayoutOpt
       width: Math.max(0, endX - x),
       endX,
       showNumber: measure.showNumber,
+      incomplete: measure.incomplete,
       startingBarline: measure.startingBarline,
       endingBarline: measure.endingBarline,
       meterChanged: measure.meterChanged,
@@ -324,21 +327,27 @@ function beatNaturalWeight(slots: PhraseSlot[], durationQuarters: number): numbe
   return Math.max(1, durationQuarters * 0.9, 0.72 + glyphDemand * 0.42 + lyricDemand * 0.28);
 }
 
-function resolveSlotCollisions(slots: SlotGeometry[], beat: BeatGeometry): SlotGeometry[] {
+function resolveSlotCollisions(
+  slots: SlotGeometry[],
+  beat: BeatGeometry,
+  compact: boolean
+): SlotGeometry[] {
   if (slots.length < 2) return slots;
-  const minimumGap = 4;
+  const minimumGap = compact ? 2 : 4;
+  const digitHalfWidth = compact ? 8 : JIANPU_METRICS.digitHalfWidth;
+  const accidentalLead = compact ? 9 : 14;
   let previousRight = beat.x;
 
   slots.forEach((geometry) => {
     const lyricLength = geometry.slot.lyricCell?.display.replace(/\s+/g, "").length ?? 0;
     const lyricHalfWidth = lyricLength * 13.5;
     const leftReserve = Math.max(
-      JIANPU_METRICS.digitHalfWidth + (geometry.slot.accidental ? 14 : 0),
+      digitHalfWidth + (geometry.slot.accidental ? accidentalLead : 0),
       lyricHalfWidth
     );
     const rightReserve =
       Math.max(
-        JIANPU_METRICS.digitHalfWidth +
+        digitHalfWidth +
           Math.max(0, geometry.slot.dots - 1) * JIANPU_METRICS.durationDotGap +
           (geometry.slot.dots ? 6 : 0),
         lyricHalfWidth
@@ -358,7 +367,7 @@ function resolveSlotCollisions(slots: SlotGeometry[], beat: BeatGeometry): SlotG
   const first = slots[0]!;
   const firstLyricLength = first.slot.lyricCell?.display.replace(/\s+/g, "").length ?? 0;
   const firstReserve = Math.max(
-    JIANPU_METRICS.digitHalfWidth + (first.slot.accidental ? 14 : 0),
+    digitHalfWidth + (first.slot.accidental ? accidentalLead : 0),
     firstLyricLength * 13.5
   );
   const leftOverflow = Math.max(0, beat.x - (first.x - firstReserve));

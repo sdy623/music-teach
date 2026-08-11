@@ -15,6 +15,7 @@ export interface PhraseSourceAnchor {
 export interface PhraseLyricCell {
   id: string;
   kind: "syllable" | "multiChar" | "extension" | "space";
+  raw: string;
   display: string;
   normalizedText: string;
   tokenId?: string;
@@ -44,6 +45,8 @@ export interface PhraseSlot {
   dots: number;
   attack: boolean;
   tieGhost: boolean;
+  context?: boolean;
+  contextRole?: "before" | "after";
   lyricCell?: PhraseLyricCell;
 }
 
@@ -63,6 +66,7 @@ export interface PhraseMeasure {
   denominator: number;
   meterChanged: boolean;
   showNumber: boolean;
+  incomplete: boolean;
   beats: PhraseBeat[];
   startingBarline?: BarlineEvent["style"];
   endingBarline?: BarlineEvent["style"];
@@ -93,6 +97,37 @@ export interface TeachingMark {
   label: string;
   explanation?: string;
   tone: "grammar" | "vocabulary" | "pronunciation";
+  start?: number;
+  end?: number;
+  color?: string;
+}
+
+export interface TeachingHighlightPalette {
+  grammar?: string;
+  vocabulary?: string;
+  pronunciation?: string;
+}
+
+export interface TeachingTextSegment {
+  id: string;
+  text: string;
+  mark?: TeachingMark;
+  color?: string;
+}
+
+export interface TeachingRubyToken {
+  id: string;
+  surface: string;
+  reading?: string;
+  start?: number;
+  end?: number;
+}
+
+export interface SongProgressSection {
+  id: string;
+  label: string;
+  startPhrase: number;
+  endPhrase: number;
 }
 
 export interface PhraseTeachingContent {
@@ -101,6 +136,7 @@ export interface PhraseTeachingContent {
   reading?: string;
   romaji?: string;
   translation?: string;
+  rubyTokens?: TeachingRubyToken[];
   marks?: TeachingMark[];
   coachNote?: string;
 }
@@ -108,6 +144,8 @@ export interface PhraseTeachingContent {
 export interface JianpuPhraseFrame {
   id: string;
   index: number;
+  kind?: "vocal" | "instrumental";
+  layoutDensity?: "normal" | "compact";
   sourceBlockId: string;
   title: string;
   subtitle?: string;
@@ -135,6 +173,8 @@ export interface JianpuLessonDeck {
   title: string;
   subtitle?: string;
   artist?: string;
+  credits?: string[];
+  tags?: string[];
   phrases: JianpuPhraseFrame[];
   diagnostics: Diagnostic[];
 }
@@ -157,6 +197,7 @@ export interface PhraseAnchorRule {
 
 export interface BuildLessonDeckOptions {
   id?: string;
+  tags?: string[];
   teachingByPhrase?: Record<number, PhraseTeachingContent>;
   minimumCells?: number;
   softBreakMode?: "every-separator" | "linguistic";

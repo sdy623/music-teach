@@ -5,16 +5,28 @@ import "./slide.css";
 import { decodeJPWABCWithInfo } from "../core/decode";
 import { demoFixtures, findFixture } from "../demo/fixtures";
 import { parseJPWABC } from "../parser/parseJPWABC";
+import type { ScoreIR } from "../ir/score";
 import { buildLessonDeck } from "./buildLessonDeck";
 import JianpuLessonSlide from "./JianpuLessonSlide.vue";
 import JianpuTitleSlide from "./JianpuTitleSlide.vue";
 import type { JianpuLessonDeck, PhraseSlot } from "./types";
-import { findNextPlayablePhraseIndex } from "./playback";
+import { buildSongProgressSections } from "./teachingPresentation";
+import {
+  findNextPlayablePhraseIndex,
+  firstPerformedSlotIndex,
+  isPerformedSlot,
+  nextPerformedSlotIndex,
+  nextPlaybackDeadline,
+  playbackDelayMilliseconds,
+  slotDurationMilliseconds
+} from "./playback";
 import {
   SONG_SECTION_PRESETS,
   createCustomSectionPreset
 } from "../project/projectBuilder";
-import type { SongSectionPreset } from "../project/types";
+import type { SectionId, SongSectionPreset } from "../project/types";
+import { convertParsedScoreToTeachingProject } from "../project/jpwabcProject";
+import { downloadTeachingProject } from "../project/projectExport";
 
 const route = useRoute();
 const router = useRouter();
@@ -38,7 +50,8 @@ const phraseIndex = computed(() => {
   const raw = routeParamText(route.params.phraseIndex);
   return /^\d+$/.test(raw) ? Number(raw) : -1;
 });
-const activeSlot = ref(0);
+const activeSlot = ref(-1);
+const score = ref<ScoreIR | null>(null);
 const deck = ref<JianpuLessonDeck | null>(null);
 const status = ref("Loading");
 const playing = ref(false);
@@ -51,6 +64,7 @@ const autoAdvance = ref(true);
 const omitMarkedPhrases = ref(true);
 let playTimer: number | undefined;
 let awaitingPhraseAdvance = false;
+let playbackDeadline: number | undefined;
 
 interface PhrasePresentationSettings {
   annotation: string;
@@ -59,7 +73,7 @@ interface PhrasePresentationSettings {
 }
 
 const phraseSettings = ref<Record<string, PhrasePresentationSettings>>({});
-const sectionBreaks = ref<Record<string, string>>({});
+const sectionBreaks = ref<Record<string, SectionId>>({});
 const customSections = ref<SongSectionPreset[]>([]);
 const customSectionName = ref("");
 
@@ -69,6 +83,21 @@ const titlePhrase = computed(() => deck.value?.phrases[0]);
 const phrase = computed(() =>
   phraseIndex.value < 0 ? undefined : deck.value?.phrases[phraseIndex.value]
 );
+const performedSlotIndexes = computed(() =>
+  (phrase.value?.slots ?? []).flatMap((slot, index) =>
+    isPerformedSlot(slot) ? [index] : []
+  )
+);
+const timelineSlotPosition = computed({
+  get: () => Math.max(0, performedSlotIndexes.value.indexOf(activeSlot.value)),
+  set: (position: number) => {
+    const index = Math.max(
+      0,
+      Math.min(Math.round(position), performedSlotIndexes.value.length - 1)
+    );
+    activeSlot.value = performedSlotIndexes.value[index] ?? -1;
+  }
+});
 const phraseCountLabel = computed(() => {
   if (!deck.value?.phrases.length) return "0 / 0";
   if (isTitleSlide.value) return "TITLE";
@@ -87,7 +116,16 @@ const availableSectionPresets = computed(() => [
   ...customSections.value
 ]);
 const currentSectionLabel = computed(() =>
-  sectionDisplayLabel(sectionForPhrase(phraseIndex.value))
+  phrase.value?.kind === "instrumental"
+    ? ""
+    : sectionDisplayLabel(sectionForPhrase(phraseIndex.value))
+);
+const progressSections = computed(() =>
+  buildSongProgressSections(
+    (deck.value?.phrases ?? []).map((candidate) => candidate.id),
+    sectionBreaks.value,
+    sectionDisplayLabel
+  )
 );
 
 async function loadScore(id: string): Promise<void> {
@@ -100,7 +138,11 @@ async function loadScore(id: string): Promise<void> {
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
     const decoded = decodeJPWABCWithInfo(await response.arrayBuffer());
     const parsed = parseJPWABC(decoded.text).value;
-    deck.value = buildLessonDeck(parsed, { id });
+    score.value = parsed;
+    deck.value = buildLessonDeck(parsed, { id, tags: fixture.tags });
+    if (Object.keys(sectionBreaks.value).length === 0) {
+      sectionBreaks.value = defaultSectionBreaks(deck.value);
+    }
     if (phraseIndex.value >= deck.value.phrases.length) {
       const lastIndex = deck.value.phrases.length - 1;
       void router.replace(
@@ -109,12 +151,51 @@ async function loadScore(id: string): Promise<void> {
           : { name: "phrase", params: { scoreId: id, phraseIndex: lastIndex } }
       );
     }
-    activeSlot.value = 0;
+    resetActiveSlot();
     status.value = `${fixture.label} · ${decoded.encoding} · ${deck.value.phrases.length} phrases`;
   } catch (error) {
+    score.value = null;
     deck.value = null;
     status.value = error instanceof Error ? error.message : String(error);
   }
+}
+
+function exportCurrentProject(): void {
+  const currentScore = score.value;
+  const currentDeck = deck.value;
+  if (!currentScore || !currentDeck) return;
+
+  const project = convertParsedScoreToTeachingProject(
+    currentScore,
+    scoreId.value,
+    currentDeck
+  ).project;
+  const projectPhraseIdByFrameId = new Map<string, string>();
+  project.phrases = project.phrases.map((projectPhrase, index) => {
+    const frame = currentDeck.phrases[index];
+    if (frame) projectPhraseIdByFrameId.set(frame.id, projectPhrase.id);
+    const saved = frame ? phraseSettings.value[frame.id] : undefined;
+    return saved
+      ? {
+          ...projectPhrase,
+          annotation: saved.annotation,
+          showMetronome: saved.showMetronome,
+          skipDuringPlayback: saved.skipDuringPlayback
+        }
+      : projectPhrase;
+  });
+
+  const savedSectionBreaks = Object.entries(sectionBreaks.value).flatMap(
+    ([frameId, section]) => {
+      const phraseId = projectPhraseIdByFrameId.get(frameId);
+      return phraseId ? [{ phraseId, section }] : [];
+    }
+  );
+  if (savedSectionBreaks.length > 0) {
+    project.sectionBreaks = savedSectionBreaks;
+  }
+  project.customSections = [...customSections.value];
+  downloadTeachingProject(project);
 }
 
 function setPhrase(index: number): void {
@@ -129,10 +210,15 @@ function setPhrase(index: number): void {
           params: { scoreId: scoreId.value, phraseIndex: nextIndex }
         }
   );
-  activeSlot.value = 0;
+  activeSlot.value = -1;
 }
 
-function selectSlot(_slot: PhraseSlot, index: number): void {
+function resetActiveSlot(): void {
+  activeSlot.value = firstPerformedSlotIndex(phrase.value?.slots ?? []);
+}
+
+function selectSlot(slot: PhraseSlot, index: number): void {
+  if (!isPerformedSlot(slot)) return;
   activeSlot.value = index;
 }
 
@@ -141,6 +227,7 @@ function togglePlayback(): void {
     const firstIndex = nextPlayablePhraseIndex(-1);
     if (firstIndex < 0) return;
     playing.value = true;
+    playbackDeadline = undefined;
     awaitingPhraseAdvance = true;
     void router.push({
       name: "phrase",
@@ -162,18 +249,38 @@ function togglePlayback(): void {
     return;
   }
   playing.value = true;
+  playbackDeadline = undefined;
   scheduleNextSlot();
 }
 
 function scheduleNextSlot(): void {
   if (!playing.value || !phrase.value) return;
+  if (
+    activeSlot.value < 0 ||
+    !isPerformedSlot(phrase.value.slots[activeSlot.value] ?? { context: true })
+  ) {
+    resetActiveSlot();
+  }
   const current = phrase.value.slots[activeSlot.value];
+  if (!current) {
+    advancePlayback();
+    return;
+  }
   const bpm = Number(phrase.value.tempo || 73);
-  const duration = Math.max(0.25, Math.min(1.5, current?.durationBeats ?? 0.5));
+  const now = performance.now();
+  playbackDeadline = nextPlaybackDeadline(
+    playbackDeadline,
+    now,
+    slotDurationMilliseconds(current, bpm)
+  );
   playTimer = window.setTimeout(() => {
     if (!phrase.value) return;
-    if (activeSlot.value < phrase.value.slots.length - 1) {
-      activeSlot.value += 1;
+    const nextSlot = nextPerformedSlotIndex(
+      phrase.value.slots,
+      activeSlot.value
+    );
+    if (nextSlot >= 0) {
+      activeSlot.value = nextSlot;
       scheduleNextSlot();
       return;
     }
@@ -182,7 +289,7 @@ function scheduleNextSlot(): void {
     } else {
       stopPlayback();
     }
-  }, Math.max(150, (60_000 / bpm) * duration));
+  }, playbackDelayMilliseconds(playbackDeadline, now));
 }
 
 function advancePlayback(): void {
@@ -192,7 +299,7 @@ function advancePlayback(): void {
     return;
   }
   awaitingPhraseAdvance = true;
-  activeSlot.value = 0;
+  activeSlot.value = -1;
   void router.push({
     name: "phrase",
     params: { scoreId: scoreId.value, phraseIndex: nextIndex }
@@ -212,6 +319,7 @@ function nextPlayablePhraseIndex(fromIndex: number): number {
 function stopPlayback(): void {
   playing.value = false;
   awaitingPhraseAdvance = false;
+  playbackDeadline = undefined;
   if (playTimer !== undefined) window.clearTimeout(playTimer);
   playTimer = undefined;
 }
@@ -319,6 +427,11 @@ function sectionDisplayLabel(section: string): string {
   return availableSectionPresets.value.find((preset) => preset.id === section)?.label ?? section;
 }
 
+function defaultSectionBreaks(lessonDeck: JianpuLessonDeck): Record<string, SectionId> {
+  const firstVocal = lessonDeck.phrases.find((candidate) => candidate.kind !== "instrumental");
+  return firstVocal ? { [firstVocal.id]: "verse" } : {};
+}
+
 function addCustomSection(): void {
   const preset = createCustomSectionPreset(
     customSectionName.value,
@@ -330,7 +443,7 @@ function addCustomSection(): void {
   saveCustomSections();
 }
 
-function removeCustomSection(section: string): void {
+function removeCustomSection(section: SectionId): void {
   customSections.value = customSections.value.filter(
     (preset) => preset.id !== section
   );
@@ -341,10 +454,10 @@ function removeCustomSection(section: string): void {
   saveSectionBreaks();
 }
 
-function sectionForPhrase(index: number): string {
+function sectionForPhrase(index: number): SectionId | "" {
   if (index < 0) return "";
   const phrases = deck.value?.phrases ?? [];
-  let current = "";
+  let current: SectionId | "" = "";
   for (let phraseIndex = 0; phraseIndex <= index; phraseIndex += 1) {
     const phraseId = phrases[phraseIndex]?.id;
     if (phraseId && sectionBreaks.value[phraseId]) {
@@ -364,7 +477,7 @@ function addSectionBreak(index: number): void {
   saveSectionBreaks();
 }
 
-function updateSectionBreak(phraseId: string, section: string): void {
+function updateSectionBreak(phraseId: string, section: SectionId): void {
   sectionBreaks.value = { ...sectionBreaks.value, [phraseId]: section };
   saveSectionBreaks();
 }
@@ -378,7 +491,7 @@ function removeSectionBreak(phraseId: string): void {
 
 watch(scoreId, (id) => void loadScore(id), { immediate: true });
 watch(phrase, () => {
-  activeSlot.value = 0;
+  resetActiveSlot();
   if (playing.value && awaitingPhraseAdvance) {
     awaitingPhraseAdvance = false;
     void nextTick().then(scheduleNextSlot);
@@ -406,9 +519,14 @@ onBeforeUnmount(stopPlayback);
           {{ isSectionMap ? "返回乐句播放器" : "段落划分" }}
         </RouterLink>
         <RouterLink class="legacy-link" :to="{ name: 'project-new' }">新建教学工程</RouterLink>
-        <RouterLink class="legacy-link" :to="{ name: 'legacy', params: { scoreId } }">
-          旧实验页
-        </RouterLink>
+        <button
+          class="legacy-link"
+          type="button"
+          :disabled="!deck || !score"
+          @click="exportCurrentProject"
+        >
+          导出教学工程
+        </button>
       </div>
     </header>
 
@@ -430,10 +548,10 @@ onBeforeUnmount(stopPlayback);
       <label class="timeline-control">
         <span>时间轴</span>
         <input
-          v-model.number="activeSlot"
+          v-model.number="timelineSlotPosition"
           type="range"
           min="0"
-          :max="Math.max(0, (phrase?.slots.length ?? 1) - 1)"
+          :max="Math.max(0, performedSlotIndexes.length - 1)"
           step="1"
         />
       </label>
@@ -462,13 +580,22 @@ onBeforeUnmount(stopPlayback);
           v-for="candidate in deck?.phrases"
           :key="candidate.id"
           type="button"
-          :class="{ 'is-selected': candidate.index === phraseIndex }"
+          :class="{
+            'is-selected': candidate.index === phraseIndex,
+            'is-instrumental': candidate.kind === 'instrumental'
+          }"
           @click="setPhrase(candidate.index)"
         >
           <span>{{ String(candidate.index + 1).padStart(2, "0") }}</span>
-          <strong>{{ candidate.teaching?.surface || candidate.normalizedText }}</strong>
+          <strong>
+            {{ candidate.kind === "instrumental" ? candidate.normalizedText || "过门" : candidate.teaching?.surface || candidate.normalizedText }}
+          </strong>
           <small>
-            <template v-if="sectionForPhrase(candidate.index)">
+            <template v-if="candidate.kind === 'instrumental'">
+              {{ candidate.measures.length }} 小节 ·
+              {{ candidate.normalizedText === "前奏" ? "Intro" : "Interlude" }} ·
+            </template>
+            <template v-else-if="sectionForPhrase(candidate.index)">
               {{ sectionDisplayLabel(sectionForPhrase(candidate.index)) }} ·
             </template>
             BAR {{ candidate.sourceAnchor.startMeasure }}–{{ candidate.sourceAnchor.endMeasure }}
@@ -488,6 +615,8 @@ onBeforeUnmount(stopPlayback);
             :phrase="titlePhrase"
             :subtitle="deck?.subtitle"
             :artist="deck?.artist"
+            :credits="deck?.credits"
+            :tags="deck?.tags"
           />
           <JianpuLessonSlide
             v-else-if="phrase"
@@ -500,6 +629,11 @@ onBeforeUnmount(stopPlayback);
             :show-beat-pulse="showBeatPulse && currentPhraseSettings.showMetronome"
             :section-label="currentSectionLabel"
             :annotation="currentPhraseSettings.annotation"
+            :artist="deck?.artist"
+            :credits="deck?.credits"
+            :tags="deck?.tags"
+            :phrase-count="deck?.phrases.length ?? 1"
+            :progress-sections="progressSections"
             @select-slot="selectSlot"
           />
           <div v-else class="stage-empty">{{ status }}</div>
@@ -523,7 +657,9 @@ onBeforeUnmount(stopPlayback);
               :checked="currentPhraseSettings.skipDuringPlayback"
               @change="updatePhraseSetting('skipDuringPlayback', ($event.target as HTMLInputElement).checked)"
             />
-            连续播放时跳过
+            {{ phrase.kind === "instrumental"
+              ? `连续播放时省略此${phrase.normalizedText || "过门"}`
+              : "连续播放时跳过" }}
           </label>
           <label class="phrase-annotation-field">
             <span>自由注释</span>
@@ -596,7 +732,7 @@ onBeforeUnmount(stopPlayback);
                 :aria-label="`第 ${candidate.index + 1} 句起始段落`"
                 @change="updateSectionBreak(
                   candidate.id,
-                  ($event.target as HTMLSelectElement).value
+                  ($event.target as HTMLSelectElement).value as SectionId
                 )"
               >
                 <option

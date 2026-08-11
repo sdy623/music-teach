@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   analyzeJapaneseReference,
   createTeachingProject,
+  formatProjectCredits,
   removeSectionBreak,
   resolvePhraseSection,
   setSectionBreak,
@@ -66,5 +67,25 @@ describe("teaching project builder", () => {
       base.phrases[2]!.id
     );
     expect(resolvePhraseSection(withoutChorus, 3)).toBe("verse");
+  });
+
+  it("combines matching lyricist and composer as a suffix credit", () => {
+    expect(
+      formatProjectCredits({
+        lyricist: "山田太郎",
+        composer: "山田太郎",
+        arranger: "",
+        otherCredits: "{山田太郎}词曲,{教学合唱团}演唱"
+      })
+    ).toBe("山田太郎 词曲 · 教学合唱团 演唱");
+
+    expect(
+      formatProjectCredits({
+        lyricist: "作词者",
+        composer: "作曲者",
+        arranger: "编曲者",
+        otherCredits: ""
+      })
+    ).toBe("作词 作词者 · 作曲 作曲者 · 编曲 编曲者");
   });
 });

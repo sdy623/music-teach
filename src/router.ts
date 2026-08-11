@@ -5,7 +5,6 @@ import {
   type RouteLocationGeneric,
   type RouterHistory
 } from "vue-router";
-import LegacyRendererApp from "./legacy/LegacyRendererApp.vue";
 import SlideStudio from "./slide/SlideStudio.vue";
 import TeachingProjectStudio from "./project/TeachingProjectStudio.vue";
 import { findFixture } from "./demo/fixtures";
@@ -15,18 +14,8 @@ function queryText(value: LocationQueryValue | LocationQueryValue[]): string {
   return value ?? "";
 }
 
-function legacyQueryRedirect(to: RouteLocationGeneric) {
+function rootQueryRedirect(to: RouteLocationGeneric) {
   const scoreId = findFixture(queryText(to.query.score) || "sakura").id;
-  if (queryText(to.query.legacy) === "1") {
-    return {
-      name: queryText(to.query.edit) === "1" ? "legacy-edit" : "legacy",
-      params: { scoreId },
-      query: {
-        ...(queryText(to.query.phrase) === "1" ? { phrase: "1" } : {})
-      }
-    };
-  }
-
   const phrase = queryText(to.query.phrase);
   if (/^\d+$/.test(phrase)) {
     return {
@@ -45,7 +34,7 @@ export function createAppRouter(history: RouterHistory = createWebHistory(import
       {
         path: "/",
         name: "home",
-        redirect: legacyQueryRedirect
+        redirect: rootQueryRedirect
       },
       {
         path: "/scores/:scoreId",
@@ -66,16 +55,6 @@ export function createAppRouter(history: RouterHistory = createWebHistory(import
         path: "/projects/new",
         name: "project-new",
         component: TeachingProjectStudio
-      },
-      {
-        path: "/legacy/:scoreId/edit",
-        name: "legacy-edit",
-        component: LegacyRendererApp
-      },
-      {
-        path: "/legacy/:scoreId",
-        name: "legacy",
-        component: LegacyRendererApp
       },
       {
         path: "/:pathMatch(.*)*",

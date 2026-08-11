@@ -3,6 +3,7 @@ export { layoutPhrase } from "./layoutPhrase";
 export { default as JianpuPhraseNotation } from "./JianpuPhraseNotation.vue";
 export { default as JianpuLessonSlide } from "./JianpuLessonSlide.vue";
 export { default as JianpuTitleSlide } from "./JianpuTitleSlide.vue";
+export { buildTeachingRubyTokens } from "./teachingPresentation";
 export type {
   BuildLessonDeckOptions,
   JianpuLessonDeck,
@@ -17,5 +18,6 @@ export type {
   PhraseSplitRule,
   PhraseSlot,
   PhraseTeachingContent,
-  TeachingMark
+  TeachingMark,
+  TeachingRubyToken
 } from "./types";

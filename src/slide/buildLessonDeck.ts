@@ -8,7 +8,14 @@ import {
   meterBeatGroups,
   totalDurationQuarters
 } from "../notation/jianpuRules";
-import { displayTitleText, formatKeyOfOneForDisplay, parseKeyAndMeterMarks, parseTempoExpression } from "../parser/parseTitle";
+import {
+  displayTitleText,
+  formatKeyOfOneForDisplay,
+  parseKeyAndMeterMarks,
+  parseTempoExpression,
+  parseTitleCredits,
+  parseTitleTags
+} from "../parser/parseTitle";
 import type {
   BuildLessonDeckOptions,
   JianpuLessonDeck,
@@ -71,12 +78,24 @@ export function buildLessonDeck(score: ScoreIR, options: BuildLessonDeckOptions 
   const voice = score.voices[0];
   const title = displayTitleText(score.title.title) || "Untitled";
   const subtitle = displayTitleText(score.title.subTitle2 || score.title.subTitle) || undefined;
+  const titleCredits = parseTitleCredits(score.title.wordsByAndMusicBy);
+  const artist = titleCredits
+    .filter((credit) => credit.role === "vocals")
+    .map((credit) => credit.name)
+    .join(" · ") || undefined;
+  const credits = titleCredits.map((credit) =>
+    `${credit.name}${credit.roleLabel ? ` ${credit.roleLabel}` : ""}`
+  );
+  const tags = [...new Set([...parseTitleTags(score.title), ...(options.tags ?? [])])];
 
   if (!voice) {
     return {
       id: options.id ?? slugify(title),
       title,
       subtitle,
+      artist,
+      credits,
+      tags,
       phrases: [],
       diagnostics: score.diagnostics
     };
@@ -113,15 +132,111 @@ export function buildLessonDeck(score: ScoreIR, options: BuildLessonDeckOptions 
     id: options.id ?? slugify(title),
     title,
     subtitle,
-    artist: firstCreditLine(score.title.wordsByAndMusicBy),
+    artist,
+    credits,
+    tags,
     phrases,
     diagnostics: score.diagnostics
   };
 }
 
+export interface InstrumentalMeasureFrameOptions {
+  idPrefix?: string;
+  label?: string;
+  annotation?: string;
+}
+
+export function buildInstrumentalMeasureFrame(
+  score: ScoreIR,
+  startMeasure: number,
+  endMeasure: number,
+  index: number,
+  options: InstrumentalMeasureFrameOptions = {}
+): JianpuPhraseFrame | undefined {
+  const voice = score.voices[0];
+  if (!voice || endMeasure < startMeasure) return undefined;
+
+  const phraseEvents = voice.events.filter(
+    (event) =>
+      (event.measure ?? 0) >= startMeasure &&
+      (event.measure ?? 0) <= endMeasure
+  );
+  const slotEvents = phraseEvents.filter(isSlotEvent);
+  const firstEvent = slotEvents[0];
+  const lastEvent = slotEvents.at(-1);
+  if (!firstEvent || !lastEvent) return undefined;
+
+  const timing = buildEventTiming(voice.events, score);
+  const slots = buildPhraseSlots(phraseEvents, timing, new Map());
+  const titleMeter = initialKeyMeter(score);
+  const resolvedKeyChanges = resolveScoreKeyChanges(score, voice.events);
+  const activeKeyChange = resolvedKeyChanges
+    .filter((change) => change.event.position <= firstEvent.position)
+    .at(-1);
+  const tempo = parseTempoExpression(score.title.expression);
+  const measureCount = endMeasure - startMeasure + 1;
+  const label = options.label ?? "过门";
+  const frame: JianpuPhraseFrame = {
+    id: `${options.idPrefix ?? "instrumental"}-${startMeasure}-${endMeasure}`,
+    index,
+    kind: "instrumental",
+    layoutDensity: "compact",
+    sourceBlockId: `instrumental-${startMeasure}-${endMeasure}`,
+    title: displayTitleText(score.title.title) || "Untitled",
+    subtitle: displayTitleText(score.title.subTitle) || undefined,
+    keyOfOne: formatKeyOfOneForDisplay(
+      activeKeyChange?.keyOfOne ?? titleMeter.keyOfOne
+    ),
+    titleMeter: {
+      numerator: titleMeter.numerator,
+      denominator: titleMeter.denominator
+    },
+    tempo: tempo?.bpm,
+    expression: tempo?.expressionText,
+    lyricText: "",
+    normalizedText: label,
+    breakStrength: 3,
+    sourceAnchor: {
+      startMeasure,
+      startNote: firstEvent.noteIndex ?? 1,
+      endMeasure,
+      endNote: lastEvent.noteIndex ?? 1,
+      startsInsideMeasure: false,
+      endsInsideMeasure: false
+    },
+    lyricCells: [],
+    measures: buildPhraseMeasures(phraseEvents, slots, score),
+    slots,
+    curves: buildPhraseCurves(score, phraseEvents),
+    keyChanges: [],
+    teaching: {
+      surface: label,
+      coachNote:
+        options.annotation ?? `原曲同步${label} · 连续 ${measureCount} 小节`
+    }
+  };
+
+  assignKeyChangesToPhrases(
+    [frame],
+    resolvedKeyChanges.filter(
+      (change) =>
+        change.event.position >= firstEvent.position &&
+        change.event.position <= lastEvent.position
+    ),
+    voice.events
+  );
+  return frame;
+}
+
+export interface ExpandPhraseFrameOptions {
+  extendToBarline?: boolean;
+  fullMeasures?: boolean;
+}
+
 export function expandPhraseFrameToMusicRange(
   score: ScoreIR,
-  frame: JianpuPhraseFrame
+  frame: JianpuPhraseFrame,
+  options: ExpandPhraseFrameOptions = {}
 ): JianpuPhraseFrame {
   const voice = score.voices[0];
   if (!voice || frame.slots.length === 0) return frame;
@@ -134,21 +249,276 @@ export function expandPhraseFrameToMusicRange(
   const lastEvent = boundaryEvents.at(-1);
   if (!firstEvent || !lastEvent) return frame;
 
+  let startPosition = firstEvent.position;
+  let endPosition = lastEvent.position;
+  if (options.fullMeasures) {
+    const firstMeasure = firstEvent.measure ?? 1;
+    const lastMeasure = lastEvent.measure ?? firstMeasure;
+    const measureEvents = voice.events.filter((event) => {
+      const measure = event.measure ?? 0;
+      return measure >= firstMeasure && measure <= lastMeasure;
+    });
+    startPosition = measureEvents[0]?.position ?? startPosition;
+    endPosition = measureEvents.at(-1)?.position ?? endPosition;
+  } else if (options.extendToBarline) {
+    const lastEventIndex = voice.events.indexOf(lastEvent);
+    for (let index = lastEventIndex + 1; index < voice.events.length; index += 1) {
+      const event = voice.events[index]!;
+      if ((event.measure ?? lastEvent.measure) !== lastEvent.measure) break;
+      endPosition = event.position;
+      if (event.kind === "barline") break;
+    }
+  }
+
   const phraseEvents = voice.events.filter(
-    (event) => event.position >= firstEvent.position && event.position <= lastEvent.position
+    (event) => event.position >= startPosition && event.position <= endPosition
   );
   const lyricBySlot = new Map(
     frame.lyricCells.flatMap((cell) => cell.eventId ? [[cell.eventId, cell] as const] : [])
   );
   const timing = buildEventTiming(voice.events, score);
-  const slots = buildPhraseSlots(phraseEvents, timing, lyricBySlot);
+  const eventPositions = new Map(
+    phraseEvents.map((event) => [event.id, event.position] as const)
+  );
+  const slots = buildPhraseSlots(phraseEvents, timing, lyricBySlot).map((slot) => {
+    const position = eventPositions.get(slot.sourceEventId);
+    const contextRole: PhraseSlot["contextRole"] =
+      options.fullMeasures && position !== undefined
+      ? position < firstEvent.position
+        ? "before"
+        : position > lastEvent.position
+          ? "after"
+          : undefined
+      : undefined;
+    return contextRole
+      ? { ...slot, context: true, contextRole }
+      : slot;
+  });
 
   return {
     ...frame,
     slots,
     measures: buildPhraseMeasures(phraseEvents, slots, score),
-    curves: buildPhraseCurves(score, phraseEvents)
+    curves: buildPhraseCurves(score, phraseEvents),
+    sourceAnchor: options.fullMeasures
+      ? frame.sourceAnchor
+      : {
+          ...frame.sourceAnchor,
+          endsInsideMeasure: !phraseEndsAtBarline(phraseEvents)
+        }
   };
+}
+
+export function synchronizePhraseKeyChanges(
+  score: ScoreIR,
+  phrases: JianpuPhraseFrame[]
+): void {
+  const events = score.voices[0]?.events;
+  if (!events) return;
+  phrases.forEach((phrase) => {
+    phrase.keyChanges = [];
+  });
+  assignKeyChangesToPhrases(
+    phrases,
+    resolveScoreKeyChanges(score, events),
+    events
+  );
+}
+
+export function rebuildPhraseFrameToPerformanceRange(
+  score: ScoreIR,
+  frame: JianpuPhraseFrame,
+  nextFrame?: JianpuPhraseFrame,
+  previousFrame?: JianpuPhraseFrame,
+  leadingRestMeasures: readonly number[] = []
+): JianpuPhraseFrame {
+  const voice = score.voices[0];
+  if (!voice) return frame;
+
+  const findAnchorEvent = (anchor: { startMeasure: number; startNote: number }) =>
+    voice.events.find(
+      (event) =>
+        isSlotEvent(event) &&
+        event.measure === anchor.startMeasure &&
+        event.noteIndex === anchor.startNote
+    );
+  const firstEvent = findAnchorEvent(frame.sourceAnchor);
+  const lastEvent = voice.events.find(
+    (event) =>
+      isSlotEvent(event) &&
+      event.measure === frame.sourceAnchor.endMeasure &&
+      event.noteIndex === frame.sourceAnchor.endNote
+  );
+  if (!firstEvent || !lastEvent) return frame;
+
+  const timing = buildEventTiming(voice.events, score);
+  const nextEvent = nextFrame ? findAnchorEvent(nextFrame.sourceAnchor) : undefined;
+  const nextLeadingRestPosition = nextFrame
+    ? leadingRestPosition(
+        score,
+        voice.events,
+        timing,
+        nextFrame,
+        frame,
+        leadingRestMeasures
+      )
+    : undefined;
+  const nextBoundaryPosition = nextLeadingRestPosition ?? nextEvent?.position;
+  const lastMeasure = lastEvent.measure ?? frame.sourceAnchor.endMeasure;
+  const maximumTrailingMeasure = lastMeasure + 1;
+  const lastIndex = voice.events.indexOf(lastEvent);
+  let endPosition = lastEvent.position;
+  for (let index = lastIndex + 1; index < voice.events.length; index += 1) {
+    const event = voice.events[index]!;
+    if (nextBoundaryPosition !== undefined && event.position >= nextBoundaryPosition) break;
+    if ((event.measure ?? lastMeasure) > maximumTrailingMeasure) break;
+    if (isSlotEvent(event)) {
+      const belongsToPhraseEnd =
+        event.kind === "rest" ||
+        (event.kind === "note" && event.visualRole === "tie-ghost");
+      if (!belongsToPhraseEnd) break;
+    }
+    endPosition = event.position;
+    if (event.kind === "return") break;
+  }
+
+  const phraseLeadingRestPosition = previousFrame
+    ? leadingRestPosition(
+        score,
+        voice.events,
+        timing,
+        frame,
+        previousFrame,
+        leadingRestMeasures
+      )
+    : undefined;
+  const startEvent = phraseLeadingRestPosition === undefined
+    ? firstEvent
+    : voice.events.find((event) => event.position === phraseLeadingRestPosition) ?? firstEvent;
+  const firstIndex = voice.events.indexOf(startEvent);
+  let startPosition = startEvent.position;
+  for (let index = firstIndex - 1; index >= 0; index -= 1) {
+    const event = voice.events[index]!;
+    if (isSlotEvent(event)) break;
+    startPosition = event.position;
+    if (event.kind === "barline") break;
+  }
+
+  const phraseEvents = voice.events.filter(
+    (event) => event.position >= startPosition && event.position <= endPosition
+  );
+  const lyricBySlot = new Map(
+    frame.lyricCells.flatMap((cell) =>
+      cell.eventId ? [[cell.eventId, cell] as const] : []
+    )
+  );
+  const slots = buildPhraseSlots(
+    phraseEvents,
+    timing,
+    lyricBySlot
+  );
+  return {
+    ...frame,
+    slots,
+    measures: buildPhraseMeasures(phraseEvents, slots, score),
+    curves: buildPhraseCurves(score, phraseEvents),
+    sourceAnchor: {
+      ...frame.sourceAnchor,
+      endsInsideMeasure: !phraseEndsAtBarline(phraseEvents)
+    }
+  };
+}
+
+function leadingRestPosition(
+  score: ScoreIR,
+  events: VoiceEvent[],
+  timing: Map<string, EventTiming>,
+  frame: JianpuPhraseFrame,
+  previousFrame: JianpuPhraseFrame,
+  alignedMeasures: readonly number[]
+): number | undefined {
+  if (alignedMeasures.includes(frame.sourceAnchor.startMeasure)) {
+    const alignedPosition = leadingRestRunBeforePhrase(
+      events,
+      frame.sourceAnchor.startMeasure,
+      frame.sourceAnchor.startNote
+    );
+    if (alignedPosition !== undefined) return alignedPosition;
+  }
+  return leadingCompleteRestMeasurePosition(
+    score,
+    events,
+    timing,
+    frame,
+    previousFrame
+  );
+}
+
+function leadingRestRunBeforePhrase(
+  events: VoiceEvent[],
+  measure: number,
+  firstNote: number
+): number | undefined {
+  const firstEventIndex = events.findIndex(
+    (event) =>
+      isSlotEvent(event) &&
+      event.measure === measure &&
+      event.noteIndex === firstNote
+  );
+  if (firstEventIndex < 0) return undefined;
+
+  let firstRestPosition: number | undefined;
+  for (let index = firstEventIndex - 1; index >= 0; index -= 1) {
+    const event = events[index]!;
+    if (event.measure !== measure) break;
+    if (!isSlotEvent(event)) continue;
+    if (event.kind !== "rest") break;
+    firstRestPosition = event.position;
+  }
+  return firstRestPosition;
+}
+
+function leadingCompleteRestMeasurePosition(
+  score: ScoreIR,
+  events: VoiceEvent[],
+  timing: Map<string, EventTiming>,
+  frame: JianpuPhraseFrame,
+  previousFrame: JianpuPhraseFrame
+): number | undefined {
+  const firstMeasure = frame.sourceAnchor.startMeasure;
+  const candidateMeasure = firstMeasure - 1;
+  if (candidateMeasure < previousFrame.sourceAnchor.endMeasure) return undefined;
+
+  const measureSlots = events.filter(
+    (event): event is NoteEvent | RestEvent | RhythmEvent =>
+      isSlotEvent(event) && event.measure === candidateMeasure
+  );
+  if (!measureSlots.length || measureSlots.some((event) => event.kind !== "rest")) {
+    return undefined;
+  }
+
+  const activeMeter = meterAtMeasure(score, candidateMeasure);
+  const nominalDurationQuarters = (activeMeter.numerator * 4) / activeMeter.denominator;
+  const timedSlots = measureSlots.flatMap((event) => {
+    const eventTiming = timing.get(event.id);
+    return eventTiming ? [{ event, timing: eventTiming }] : [];
+  });
+  if (timedSlots.length !== measureSlots.length) return undefined;
+
+  const firstOffset = Math.min(
+    ...timedSlots.map(({ timing: eventTiming }) => eventTiming.measureOffsetQuarter)
+  );
+  const lastEnd = Math.max(
+    ...timedSlots.map(
+      ({ timing: eventTiming }) =>
+        eventTiming.measureOffsetQuarter + eventTiming.durationQuarters
+    )
+  );
+  if (firstOffset > 1e-6 || lastEnd < nominalDurationQuarters - 1e-6) {
+    return undefined;
+  }
+
+  return measureSlots[0]?.position;
 }
 
 function splitLyricBlock(
@@ -423,7 +793,7 @@ function isJPWAbsoluteSymbolEvent(event: VoiceEvent): boolean {
   }
   if (
     event.kind === "unknown" &&
-    /^\{(?:C:[^{}]*|YanYin)\}$/i.test(event.raw.trim())
+    /^\{(?:C:[^{}]*|YanYin|BaoChiYin)\}$/i.test(event.raw.trim())
   ) {
     return false;
   }
@@ -443,10 +813,30 @@ function assignKeyChangesToPhrases(
         .map((slot) => eventPositions.get(slot.sourceEventId) ?? Number.POSITIVE_INFINITY)
     );
 
+  const containsSourceAnchor = (
+    phrase: JianpuPhraseFrame,
+    event: NoteEvent | RestEvent | RhythmEvent
+  ): boolean => {
+    const measure = event.measure ?? 0;
+    const note = event.noteIndex ?? 0;
+    const start = phrase.sourceAnchor;
+    if (measure < start.startMeasure || measure > start.endMeasure) return false;
+    if (measure === start.startMeasure && note < start.startNote) return false;
+    if (measure === start.endMeasure && note > start.endNote) return false;
+    return true;
+  };
+
   keyChanges.forEach((change) => {
-    const containing = phrases.find((phrase) =>
-      phrase.slots.some((slot) => slot.sourceEventId === change.event.id)
-    );
+    const containing =
+      phrases.find((phrase) => containsSourceAnchor(phrase, change.event)) ??
+      phrases.find((phrase) =>
+        phrase.slots.some(
+          (slot) => slot.sourceEventId === change.event.id && !slot.context
+        )
+      ) ??
+      phrases.find((phrase) =>
+        phrase.slots.some((slot) => slot.sourceEventId === change.event.id)
+      );
     const target =
       containing ??
       phrases.find((phrase) => phraseStartPosition(phrase) >= change.event.position) ??
@@ -454,6 +844,10 @@ function assignKeyChangesToPhrases(
     if (!target) return;
 
     const renderSlot =
+      target.slots.find(
+        (slot) =>
+          slot.kind !== "sustain" && slot.sourceEventId === change.event.id
+      ) ??
       target.slots
         .filter((slot) => slot.kind !== "sustain")
         .find(
@@ -481,6 +875,7 @@ function toPhraseLyricCell(entry: AlignedCell): PhraseLyricCell {
   return {
     id: cell.id,
     kind: cell.kind === "separator" ? "space" : cell.kind,
+    raw: cell.raw,
     display: cell.kind === "separator" ? "" : cell.display,
     normalizedText: cell.normalizedText ?? "",
     tokenId: cell.tokenId,
@@ -617,6 +1012,18 @@ function buildPhraseMeasures(events: VoiceEvent[], slots: PhraseSlot[], score: S
         .filter((slot) => slot.beatIndex === beatIndex)
         .sort((a, b) => a.beatOffset - b.beatOffset || a.noteIndex - b.noteIndex)
     }));
+    const nominalDurationQuarters = (numerator * 4) / denominator;
+    const firstOffset = Math.min(
+      ...measureSlots.map((slot) => slot.measureOffsetQuarter)
+    );
+    const lastEnd = Math.max(
+      ...measureSlots.map(
+        (slot) => slot.measureOffsetQuarter + slot.durationQuarters
+      )
+    );
+    const incomplete =
+      firstOffset > 1e-6 ||
+      lastEnd < nominalDurationQuarters - 1e-6;
 
     return {
       id: `phrase-measure-${measureNumber}`,
@@ -629,7 +1036,8 @@ function buildPhraseMeasures(events: VoiceEvent[], slots: PhraseSlot[], score: S
         activeMeter,
         measureIndex
       ),
-      showNumber: firstSourceSlot?.noteIndex === 1,
+      showNumber: firstSourceSlot?.noteIndex === 1 || incomplete,
+      incomplete,
       beats,
       startingBarline: startingBarline?.style,
       endingBarline: endingBarline?.style
@@ -895,10 +1303,6 @@ function isSlotEvent(event: VoiceEvent): event is NoteEvent | RestEvent | Rhythm
 
 function isSingableEvent(event: VoiceEvent): event is NoteEvent | RhythmEvent {
   return event.kind === "note" || event.kind === "rhythm";
-}
-
-function firstCreditLine(value: string | undefined): string | undefined {
-  return displayTitleText(value).split("\n").map((line) => line.trim()).find(Boolean);
 }
 
 function slugify(value: string): string {

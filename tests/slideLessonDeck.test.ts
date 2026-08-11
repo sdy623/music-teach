@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { decodeJPWABC } from "../src/core/decode";
 import { parseJPWABC } from "../src/parser/parseJPWABC";
-import { buildLessonDeck } from "../src/slide/buildLessonDeck";
+import {
+  buildLessonDeck,
+  rebuildPhraseFrameToPerformanceRange
+} from "../src/slide/buildLessonDeck";
 import { layoutPhrase } from "../src/slide/layoutPhrase";
 
 function loadFixture(name: string) {
@@ -131,5 +134,37 @@ W1@1,1:
     });
 
     expect(deck.phrases.map((phrase) => phrase.normalizedText)).toEqual(["あいう", "えおか"]);
+  });
+
+  it("assigns a complete leading rest measure to the following phrase", () => {
+    const score = parseJPWABC(`
+.Title
+KeyAndMeters = 1=C,4/4
+.Voice
+| 1 1 1 1 | 0--- | 2 2 2 2 |
+.Words
+W1@1,1:
+あ///い
+`).value;
+    const basePhrases = buildLessonDeck(score).phrases;
+    const phrases = basePhrases.map((phrase, index) =>
+      rebuildPhraseFrameToPerformanceRange(
+        score,
+        phrase,
+        basePhrases[index + 1],
+        basePhrases[index - 1]
+      )
+    );
+    const [first, second] = phrases;
+    const leadingRestSlots = second?.slots.filter((slot) => slot.measure === 2) ?? [];
+
+    expect(phrases).toHaveLength(2);
+    expect(second?.measures.map((measure) => measure.number)).toEqual([2, 3]);
+    expect(second?.measures[0]).toMatchObject({ number: 2, incomplete: false });
+    expect(leadingRestSlots.some((slot) => slot.kind === "rest")).toBe(true);
+    expect(
+      leadingRestSlots.reduce((sum, slot) => sum + slot.durationQuarters, 0)
+    ).toBeCloseTo(4, 6);
+    expect(first?.slots.some((slot) => slot.measure === 2)).toBe(false);
   });
 });

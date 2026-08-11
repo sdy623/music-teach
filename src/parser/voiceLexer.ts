@@ -40,6 +40,8 @@ export function lexVoice(src: string): WithDiagnostics<VoiceEvent[]> {
       const match = raw.match(/^\{\((\d+)\}$/);
       if (match) {
         events.push(makeTuplet(raw, i, Number(match[1])));
+      } else if (/^\{BaoChiYin\}$/i.test(raw)) {
+        events.push(makeUnknown(raw, i, "Known JPW hold-sound directive"));
       } else if (!brace.closed) {
         events.push(makeUnknown(raw, i, "Unterminated brace construct"));
         diagnostics.push(

@@ -59,7 +59,14 @@
   color: #b9c5d2;
   padding: 0 12px;
   font-size: 12px;
+  font-family: inherit;
   text-decoration: none;
+  cursor: pointer;
+}
+
+.legacy-link:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .legacy-link:hover {
@@ -212,6 +219,14 @@
 .phrase-list button.is-selected {
   border-left-color: var(--studio-accent);
   background: #0b1824;
+}
+
+.phrase-list button.is-instrumental {
+  background: #0b1118;
+}
+
+.phrase-list button.is-instrumental strong {
+  color: #8fc9dd;
 }
 
 .phrase-list button > span {
@@ -666,7 +681,7 @@
   align-items: center;
   justify-content: center;
   color: var(--score-ink);
-  font-size: 42px;
+  font-size: 36px;
   font-weight: 850;
   line-height: 1;
 }
@@ -745,7 +760,7 @@
   display: grid;
   width: 1280px;
   height: 720px;
-  grid-template-rows: 86px 304px minmax(0, 1fr) 7px;
+  grid-template-rows: 86px 304px minmax(0, 1fr) 22px;
   overflow: hidden;
   transform-origin: top left;
   background: var(--score-paper-muted);
@@ -781,19 +796,26 @@
   letter-spacing: 0;
 }
 
-.lesson-song-credits {
+.lesson-song-tags {
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 5px;
   align-items: center;
   margin: 4px 0 0;
-  color: var(--score-muted);
-  font-size: 10px;
-  line-height: 1.1;
+  padding: 0;
+  list-style: none;
 }
 
-.lesson-song-credits strong {
-  color: var(--score-text);
-  font-weight: 850;
+.lesson-song-tags li {
+  border: 1px solid #b7c6d2;
+  border-radius: 3px;
+  background: #edf3f7;
+  color: #315269;
+  padding: 2px 5px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.1;
 }
 
 .jianpu-lesson-slide.is-opening-slide .lesson-song-heading h1 {
@@ -810,6 +832,16 @@
   color: var(--score-text);
   font-size: 12px;
   font-weight: 800;
+}
+
+.lesson-header-credits {
+  max-width: 520px;
+  margin: 5px 0 0;
+  color: var(--score-muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .jianpu-lesson-slide.is-opening-slide .lesson-source-anchor strong {
@@ -924,6 +956,12 @@
   font-variant-numeric: tabular-nums;
 }
 
+.phrase-measure-incomplete {
+  fill: #a96023;
+  font-size: 9px;
+  font-weight: 800;
+}
+
 .phrase-key-change-label {
   fill: var(--score-accent);
   font-family: var(--lyric-font-family);
@@ -999,6 +1037,10 @@
   transition: opacity 120ms ease;
 }
 
+.phrase-slot.is-context {
+  cursor: default;
+}
+
 .active-slot-marker {
   fill: var(--score-accent-soft);
   opacity: 0.62;
@@ -1006,9 +1048,9 @@
 
 .phrase-digit {
   fill: var(--score-ink);
-  font-family: "NotoSansJPW", "Noto Sans", Arial, sans-serif;
+  font-family: "JPFontNDSBMN", Arial, sans-serif;
   font-size: 43px;
-  font-weight: 800;
+  font-weight: 400;
   text-anchor: middle;
 }
 
@@ -1070,37 +1112,127 @@
   font-weight: 850;
 }
 
+.jianpu-lesson-slide.is-instrumental-slide .phrase-digit {
+  font-size: 24px;
+}
+
+.jianpu-lesson-slide.is-instrumental-slide .phrase-accidental {
+  font-size: 24px;
+}
+
+.jianpu-lesson-slide.is-instrumental-slide .phrase-octave-dot {
+  r: 2.4px;
+}
+
+.jianpu-lesson-slide.is-instrumental-slide .phrase-duration-dot {
+  r: 2.2px;
+}
+
+.jianpu-lesson-slide.is-instrumental-slide .phrase-beams line,
+.jianpu-lesson-slide.is-instrumental-slide .phrase-augmentation-line {
+  stroke-width: 1.9;
+}
+
 .lesson-language-band {
   display: grid;
   min-height: 0;
-  grid-template-columns: minmax(0, 1fr) 410px;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 26px;
+  align-items: center;
+  padding: 18px 40px 14px;
+  background: var(--score-paper-muted);
+}
+
+.lesson-interlude-band {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: 260px minmax(0, 1fr);
   gap: 34px;
   align-items: center;
-  padding: 22px 44px 18px;
+  padding: 28px 54px;
   background: var(--score-paper-muted);
+}
+
+.lesson-interlude-band > div {
+  display: grid;
+  gap: 7px;
+  padding-right: 30px;
+  border-right: 1px solid var(--score-rule);
+}
+
+.lesson-interlude-band span {
+  color: var(--score-muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.lesson-interlude-band strong {
+  color: var(--score-ink);
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.lesson-interlude-band p {
+  margin: 0;
+  color: var(--score-text);
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.55;
 }
 
 .lesson-language-primary {
   min-width: 0;
 }
 
-.lesson-language-primary ruby {
+.lesson-original-sentence {
+  max-width: 760px;
+  margin: 0;
   color: #111820;
-  font-size: 36px;
-  font-weight: 900;
-  line-height: 1.35;
+  font-size: 42px;
+  font-weight: 950;
+  line-height: 1.36;
   letter-spacing: 0;
 }
 
-.lesson-language-primary rt {
+.teaching-highlight {
+  --teaching-mark-color: #d64f5f;
+  border-radius: 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent 58%,
+    color-mix(in srgb, var(--teaching-mark-color) 27%, transparent) 58%
+  );
+  color: inherit;
+  padding: 0 1px;
+  text-decoration: underline;
+  text-decoration-color: var(--teaching-mark-color);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
+}
+
+.lesson-ruby-token {
+  ruby-position: over;
+  color: #111820;
+}
+
+.lesson-original-surface {
+  font: inherit;
+}
+
+.lesson-ruby-token rt {
   color: #52708b;
-  font-size: 13px;
+  font-family: var(--lyric-font-family);
+  font-size: 14px;
   font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1;
+  text-align: center;
 }
 
 .lesson-romaji,
 .lesson-translation {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
 }
 
 .lesson-romaji {
@@ -1113,6 +1245,62 @@
   color: #263746;
   font-size: 17px;
   font-weight: 650;
+}
+
+.lesson-language-notes {
+  display: flex;
+  height: 238px;
+  min-width: 0;
+  flex-direction: row-reverse;
+  align-items: flex-start;
+  gap: 12px;
+  overflow: hidden;
+  border-left: 1px solid #d4dce5;
+  padding-left: 20px;
+}
+
+.lesson-language-notes-reserved {
+  width: 100%;
+  height: 100%;
+}
+
+.lesson-coach-note-rail {
+  width: 100%;
+  align-self: center;
+}
+
+.lesson-language-note {
+  --teaching-mark-color: #d64f5f;
+  display: block;
+  height: 220px;
+  min-width: 42px;
+  max-width: 72px;
+  overflow: hidden;
+  border-top: 3px solid var(--teaching-mark-color);
+  color: #465461;
+  padding-top: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  text-orientation: mixed;
+  writing-mode: vertical-rl;
+}
+
+.lesson-language-note strong,
+.lesson-language-note span,
+.lesson-language-note p {
+  margin: 0 0 0 6px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.lesson-language-note strong {
+  color: var(--teaching-mark-color);
+  font-weight: 850;
+}
+
+.lesson-language-note span {
+  color: #18242e;
+  font-weight: 750;
 }
 
 .lesson-mark-strip {
@@ -1178,6 +1366,12 @@
   line-height: 1.5;
 }
 
+.lesson-coach-note-inline {
+  margin-top: 10px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
 .lesson-slide-progress {
   background: #dfe5ec;
 }
@@ -1187,6 +1381,90 @@
   height: 100%;
   background: #2878e3;
   transition: width 160ms linear;
+}
+
+.lesson-song-progress {
+  position: relative;
+  height: 22px;
+  overflow: hidden;
+  background: #dce4ea;
+  box-shadow: inset 0 1px 0 rgb(91 110 126 / 22%);
+}
+
+.lesson-song-progress-fill {
+  position: absolute;
+  z-index: 0;
+  inset: 0 auto 0 0;
+  background: #187eac;
+  transition: width 160ms linear;
+}
+
+.lesson-song-progress-section {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  min-width: 1px;
+  overflow: hidden;
+  color: #536779;
+}
+
+.lesson-song-progress-section i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: rgb(10 33 47 / 58%);
+}
+
+.lesson-song-progress-section b {
+  position: absolute;
+  top: 5px;
+  left: 6px;
+  overflow: hidden;
+  max-width: calc(100% - 10px);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 8px;
+  font-weight: 850;
+  line-height: 1;
+  text-overflow: clip;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lesson-song-progress-section.is-current b {
+  color: #f7fbfd;
+}
+
+.title-slide-credits {
+  margin: 16px 0 0;
+  color: var(--score-text);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.title-genre-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 15px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.title-genre-tags li {
+  border: 1px solid #9eb4c5;
+  border-radius: 4px;
+  background: #edf3f7;
+  color: #315269;
+  padding: 5px 9px 4px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1;
 }
 
 @media (max-width: 980px) {

@@ -8,16 +8,21 @@ import {
   createCustomSectionPreset,
   createProjectPhrase,
   createTeachingProject,
+  formatProjectCredits,
   removeSectionBreak,
   resolvePhraseSection,
   setSectionBreak,
   splitProjectPhrase
 } from "./projectBuilder";
 import { convertJPWABCToTeachingProject } from "./jpwabcProject";
+import {
+  deserializeTeachingProject,
+  downloadTeachingProject
+} from "./projectExport";
 import SlidevJianpuPhrase from "./SlidevJianpuPhrase.vue";
+import { buildSongProgressSections } from "../slide/teachingPresentation";
 import type {
   SectionId,
-  SongSectionPreset,
   TeachingPhraseKind,
   TeachingProject,
   TeachingProjectPhrase,
@@ -27,13 +32,6 @@ import "./projectStudio.css";
 
 const DRAFT_KEY = "jpw-teaching-project:draft";
 type EditorMode = "phrases" | "sections";
-type LegacyPhrase = TeachingProjectPhrase & { section?: SectionId };
-type LegacyProject = Omit<TeachingProject, "phrases" | "sectionBreaks" | "customSections"> & {
-  phrases: LegacyPhrase[];
-  sectionBreaks?: TeachingSectionBreak[];
-  customSections?: SongSectionPreset[];
-};
-
 const projectTitle = ref("新建教学工程");
 const sourceLyrics = ref("");
 const project = ref<TeachingProject>(
@@ -51,18 +49,10 @@ const selectedPhrase = computed(
   () => project.value.phrases[selectedIndex.value]
 );
 const selectedSectionLabel = computed(() => {
+  if (selectedPhrase.value?.kind === "instrumental") return "";
   return sectionLabel(resolvePhraseSection(project.value, selectedIndex.value));
 });
-const projectCredits = computed(() =>
-  [
-    project.value.lyricist && `作词 ${project.value.lyricist}`,
-    project.value.composer && `作曲 ${project.value.composer}`,
-    project.value.arranger && `编曲 ${project.value.arranger}`,
-    project.value.otherCredits
-  ]
-    .filter(Boolean)
-    .join(" · ")
-);
+const projectCredits = computed(() => formatProjectCredits(project.value));
 const sectionBreaksByPhrase = computed(
   () =>
     new Map(
@@ -80,8 +70,17 @@ const sectionPresets = computed(() => [
   ...POP_SECTION_PRESETS,
   ...project.value.customSections
 ]);
+const projectProgressSections = computed(() =>
+  buildSongProgressSections(
+    project.value.phrases.map((phrase) => phrase.id),
+    Object.fromEntries(
+      project.value.sectionBreaks.map((entry) => [entry.phraseId, entry.section])
+    ),
+    sectionLabel
+  )
+);
 
-function sectionLabel(section: SectionId | undefined): string {
+function sectionLabel(section: string | undefined): string {
   return sectionPresets.value.find(
     (preset) => preset.id === section
   )?.label ?? section ?? "未分段";
@@ -163,37 +162,82 @@ function updateProjectField(
   if (key === "title") projectTitle.value = value;
 }
 
+function updateProjectTags(value: string): void {
+  project.value = {
+    ...project.value,
+    tags: [...new Set(value.split(/[,，、]/).map((tag) => tag.trim()).filter(Boolean))]
+  };
+}
+
 function updatePhrase<K extends keyof TeachingProjectPhrase>(
   key: K,
   value: TeachingProjectPhrase[K]
 ): void {
+  patchSelectedPhrase({ [key]: value } as Pick<TeachingProjectPhrase, K>);
+}
+
+function patchSelectedPhrase(
+  patch: Partial<TeachingProjectPhrase>
+): void {
   const phrase = selectedPhrase.value;
   if (!phrase) return;
   const phrases = [...project.value.phrases];
-  phrases[selectedIndex.value] = { ...phrase, [key]: value };
+  phrases[selectedIndex.value] = { ...phrase, ...patch };
   project.value = { ...project.value, phrases };
 }
 
 function updateLyricText(value: string): void {
+  const phrase = selectedPhrase.value;
+  if (!phrase) return;
   const morphology = analyzeJapaneseReference(value);
+  const followsAutomaticReading =
+    phrase.lyricCells.length === 0 &&
+    (!phrase.lyricJpwabc ||
+      phrase.lyricJpwabc === phrase.referenceReading ||
+      phrase.lyricJpwabc === phrase.lyricText);
   updatePhrase("lyricText", value);
   updatePhrase("referenceReading", morphology.referenceReading);
   updatePhrase("morphology", morphology.tokens);
+  if (followsAutomaticReading) {
+    updatePhrase("lyricJpwabc", morphology.referenceReading);
+  }
 }
 
 function reanalyzeReading(): void {
   const phrase = selectedPhrase.value;
   if (!phrase) return;
   const morphology = analyzeJapaneseReference(phrase.lyricText);
+  const followsAutomaticReading =
+    phrase.lyricCells.length === 0 &&
+    (!phrase.lyricJpwabc || phrase.lyricJpwabc === phrase.referenceReading);
   updatePhrase("referenceReading", morphology.referenceReading);
   updatePhrase("morphology", morphology.tokens);
+  if (followsAutomaticReading) {
+    updatePhrase("lyricJpwabc", morphology.referenceReading);
+  }
+}
+
+function updateLyricJpwabc(value: string): void {
+  patchSelectedPhrase({
+    lyricJpwabc: value,
+    lyricCells: [],
+    frame: undefined
+  });
+}
+
+function updateVoiceLine(value: string): void {
+  patchSelectedPhrase({ voiceLine: value, frame: undefined });
 }
 
 function updatePhraseKind(kind: TeachingPhraseKind): void {
-  updatePhrase("kind", kind);
-  if (kind === "instrumental") {
-    updatePhrase("skipDuringPlayback", true);
-  }
+  patchSelectedPhrase({
+    kind,
+    frame: undefined,
+    skipDuringPlayback:
+      kind === "instrumental"
+        ? true
+        : selectedPhrase.value?.skipDuringPlayback ?? false
+  });
 }
 
 function addPhrase(kind: TeachingPhraseKind): void {
@@ -282,15 +326,7 @@ function splitSelectedPhrase(): void {
 }
 
 function exportProject(): void {
-  const blob = new Blob([JSON.stringify(project.value, null, 2)], {
-    type: "application/json"
-  });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${project.value.id || "teaching-project"}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
+  downloadTeachingProject(project.value);
 }
 
 function openProjectImport(): void {
@@ -308,16 +344,7 @@ async function importProject(event: Event): Promise<void> {
     const isJSON = file.name.toLocaleLowerCase().endsWith(".json");
     let imported: TeachingProject;
     if (isJSON) {
-      const parsed = JSON.parse(await file.text()) as LegacyProject;
-      if (
-        !parsed ||
-        typeof parsed !== "object" ||
-        typeof parsed.title !== "string" ||
-        !Array.isArray(parsed.phrases)
-      ) {
-        throw new Error("Invalid teaching project");
-      }
-      imported = migrateDraft(parsed);
+      imported = deserializeTeachingProject(await file.text());
       importStatus.value = `已导入 JSON 工程：${imported.phrases.length} 个乐句`;
     } else {
       const converted = convertJPWABCToTeachingProject(
@@ -347,45 +374,11 @@ function persistDraft(): void {
   window.localStorage.setItem(DRAFT_KEY, JSON.stringify(project.value));
 }
 
-function migrateDraft(parsed: LegacyProject): TeachingProject {
-  const sectionBreaks =
-    parsed.sectionBreaks?.filter((sectionBreak) =>
-      parsed.phrases.some((phrase) => phrase.id === sectionBreak.phraseId)
-    ) ?? [];
-
-  if (sectionBreaks.length === 0) {
-    let previousSection: SectionId | undefined;
-    parsed.phrases.forEach((phrase, index) => {
-      const section = phrase.section ?? (index === 0 ? "verse" : previousSection);
-      if (section && section !== previousSection) {
-        sectionBreaks.push({ phraseId: phrase.id, section });
-      }
-      previousSection = section;
-    });
-  }
-
-  const phrases = parsed.phrases.map((phrase) => {
-    const { section: _legacySection, ...currentPhrase } = phrase;
-    return currentPhrase;
-  });
-  return {
-    ...parsed,
-    artist: parsed.artist ?? "",
-    lyricist: parsed.lyricist ?? "",
-    composer: parsed.composer ?? "",
-    arranger: parsed.arranger ?? "",
-    otherCredits: parsed.otherCredits ?? "",
-    customSections: parsed.customSections ?? [],
-    phrases,
-    sectionBreaks
-  };
-}
-
 onMounted(() => {
   const saved = window.localStorage.getItem(DRAFT_KEY);
   if (!saved) return;
   try {
-    project.value = migrateDraft(JSON.parse(saved) as LegacyProject);
+    project.value = deserializeTeachingProject(saved);
     projectTitle.value = project.value.title;
     sourceLyrics.value = project.value.sourceLyrics;
   } catch {
@@ -472,6 +465,14 @@ watch(project, persistDraft, { deep: true });
         />
       </label>
       <label>
+        <span>流派标签</span>
+        <input
+          :value="project.tags.join(', ')"
+          placeholder="VOCALOID, J-POP"
+          @input="updateProjectTags(($event.target as HTMLInputElement).value)"
+        />
+      </label>
+      <label>
         <span>调号与拍号</span>
         <input
           :value="project.keyAndMeters"
@@ -528,8 +529,12 @@ watch(project, persistDraft, { deep: true });
             @click="selectedIndex = index"
           >
             <span>{{ String(index + 1).padStart(2, "0") }}</span>
-            <strong>{{ phrase.lyricText || phrase.kind }}</strong>
-            <small>{{ resolvedSectionAt(index) }} · {{ phrase.kind }}</small>
+            <strong>
+              {{ phrase.lyricText || phrase.annotation || (phrase.kind === "instrumental" ? "过门" : phrase.kind) }}
+            </strong>
+            <small>
+              {{ phrase.kind === "instrumental" ? "Interlude" : resolvedSectionAt(index) }} · {{ phrase.kind }}
+            </small>
           </button>
         </nav>
       </aside>
@@ -538,17 +543,27 @@ watch(project, persistDraft, { deep: true });
         <div class="project-preview">
           <SlidevJianpuPhrase
             v-if="selectedPhrase"
+            :phrase="selectedPhrase.frame"
             :voice-line="selectedPhrase.kind === 'blank' ? '' : selectedPhrase.voiceLine"
             :lyric-text="selectedPhrase.lyricText"
+            :lyric-jpwabc="selectedPhrase.lyricJpwabc"
+            :lyric-cells="selectedPhrase.lyricCells"
             :reference-reading="selectedPhrase.referenceReading"
+            :morphology="selectedPhrase.morphology"
+            :key-of-one="selectedPhrase.keyOfOne"
+            :key-changes="selectedPhrase.keyChanges"
             :title="project.title"
             :artist="project.artist"
             :credits="projectCredits"
+            :tags="project.tags"
             :key-and-meters="project.keyAndMeters"
             :expression="project.expression"
             :section="selectedSectionLabel"
             :annotation="selectedPhrase.annotation"
             :show-metronome="selectedPhrase.showMetronome"
+            :phrase-index="selectedIndex"
+            :phrase-count="project.phrases.length"
+            :progress-sections="projectProgressSections"
           />
           <div v-else class="project-preview-empty">空白工程</div>
         </div>
@@ -585,6 +600,13 @@ watch(project, persistDraft, { deep: true });
               ></textarea>
               <button type="button" @click="reanalyzeReading">重新分析</button>
             </label>
+            <label class="project-wide-field">
+              <span>JPWABC 音位歌词</span>
+              <textarea
+                :value="selectedPhrase.lyricJpwabc"
+                @input="updateLyricJpwabc(($event.target as HTMLTextAreaElement).value)"
+              ></textarea>
+            </label>
 
             <label>
               <span>页面类型</span>
@@ -593,7 +615,7 @@ watch(project, persistDraft, { deep: true });
                 @change="updatePhraseKind(($event.target as HTMLSelectElement).value as TeachingPhraseKind)"
               >
                 <option value="vocal">演唱</option>
-                <option value="instrumental">伴奏 / 过门</option>
+                <option value="instrumental">伴奏 / 前奏 / 过门</option>
                 <option value="blank">空白教学页</option>
               </select>
             </label>
@@ -619,7 +641,7 @@ watch(project, persistDraft, { deep: true });
               <textarea
                 :value="selectedPhrase.voiceLine"
                 placeholder="| 1_ 2_ 3 5 | 5-- 0_ 5_ |"
-                @input="updatePhrase('voiceLine', ($event.target as HTMLTextAreaElement).value)"
+                @input="updateVoiceLine(($event.target as HTMLTextAreaElement).value)"
               ></textarea>
             </label>
             <label class="project-wide-field">
@@ -768,7 +790,7 @@ watch(project, persistDraft, { deep: true });
           >
             <span>{{ String(index + 1).padStart(2, "0") }}</span>
             <strong>{{ phrase.lyricText || phrase.annotation || phrase.kind }}</strong>
-            <small>{{ resolvedSectionAt(index) }}</small>
+            <small>{{ phrase.kind === "instrumental" ? "Interlude" : resolvedSectionAt(index) }}</small>
             <em>{{ phrase.kind }}</em>
           </button>
         </div>

@@ -14,6 +14,8 @@ const props = defineProps<{
   phrase: JianpuPhraseFrame;
   subtitle?: string;
   artist?: string;
+  credits?: readonly string[];
+  tags?: readonly string[];
 }>();
 
 const viewport = ref<HTMLElement>();
@@ -21,6 +23,9 @@ const scale = ref(1);
 let resizeObserver: ResizeObserver | undefined;
 
 const keyParts = computed(() => splitKeyOfOne(props.phrase.keyOfOne));
+const creditLine = computed(() =>
+  props.credits?.length ? props.credits.join(" · ") : props.artist || ""
+);
 const titleClass = computed(() => {
   const length = [...props.phrase.title].length;
   if (length <= 4) return "is-short";
@@ -40,12 +45,17 @@ function updateScale(): void {
 
 onMounted(() => {
   updateScale();
-  resizeObserver = new ResizeObserver(updateScale);
-  if (viewport.value) resizeObserver.observe(viewport.value);
+  if (typeof ResizeObserver === "function") {
+    resizeObserver = new ResizeObserver(updateScale);
+    if (viewport.value) resizeObserver.observe(viewport.value);
+  } else {
+    window.addEventListener("resize", updateScale);
+  }
 });
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
+  window.removeEventListener("resize", updateScale);
 });
 </script>
 
@@ -54,12 +64,16 @@ onBeforeUnmount(() => {
     <article class="jianpu-title-slide" :style="canvasStyle">
       <header class="title-slide-topline">
         <span>JIANPU TEACHING SCORE</span>
-        <span v-if="artist">{{ artist }}</span>
+        <span v-if="creditLine">{{ creditLine }}</span>
       </header>
 
       <main class="title-slide-main">
         <h1 :class="titleClass">{{ phrase.title }}</h1>
         <p v-if="subtitle" class="title-slide-subtitle">{{ subtitle }}</p>
+        <p v-if="creditLine" class="title-slide-credits">{{ creditLine }}</p>
+        <ul v-if="tags?.length" class="title-genre-tags" aria-label="乐曲标签">
+          <li v-for="tag in tags" :key="tag">{{ tag }}</li>
+        </ul>
 
         <section class="title-musical-context" aria-label="调号、拍号、速度与表情">
           <div class="title-key-mark" aria-label="调号">

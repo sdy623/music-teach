@@ -7,6 +7,7 @@ import type {
   TeachingProjectPhrase,
   TeachingSectionBreak
 } from "./types";
+import { parseTitleCredits } from "../parser/parseTitle";
 
 export const LETTER_SECTION_PRESETS: SongSectionPreset[] = [
   { id: "A", label: "A" },
@@ -35,6 +36,48 @@ export const SONG_SECTION_PRESETS = [
   ...LETTER_SECTION_PRESETS,
   ...POP_SECTION_PRESETS
 ];
+
+export function formatProjectCredits(
+  project: Pick<TeachingProject, "lyricist" | "composer" | "arranger" | "otherCredits">
+): string {
+  const lyricist = project.lyricist.trim();
+  const composer = project.composer.trim();
+  const arranger = project.arranger.trim();
+  const lyricistKey = lyricist.normalize("NFKC");
+  const composerKey = composer.normalize("NFKC");
+  const arrangerKey = arranger.normalize("NFKC");
+  const sameWriter =
+    lyricist.length > 0 &&
+    composer.length > 0 &&
+    lyricistKey === composerKey;
+  const credits = sameWriter
+    ? [`${lyricist} 词曲`]
+    : [lyricist && `作词 ${lyricist}`, composer && `作曲 ${composer}`];
+  const structuredOtherCredits = parseTitleCredits(
+    project.otherCredits.replace(/\s*·\s*/g, ",")
+  );
+  const otherCredits = structuredOtherCredits.length
+    ? structuredOtherCredits
+        .filter((credit) => {
+          const name = credit.name.normalize("NFKC");
+          if (credit.role === "lyrics-music") {
+            return name !== lyricistKey && name !== composerKey;
+          }
+          if (credit.role === "lyrics") return name !== lyricistKey;
+          if (credit.role === "music") return name !== composerKey;
+          if (credit.role === "arrangement") return name !== arrangerKey;
+          return true;
+        })
+        .map((credit) => `${credit.name} ${credit.roleLabel}`.trim())
+    : [project.otherCredits.trim()];
+  const allCredits = [
+    ...credits,
+    arranger && `编曲 ${arranger}`,
+    ...otherCredits
+  ].filter((credit): credit is string => Boolean(credit));
+
+  return [...new Set(allCredits)].join(" · ");
+}
 
 export function createCustomSectionPreset(
   label: string,
@@ -102,8 +145,10 @@ export function createTeachingProject(
   );
 
   return {
+    formatVersion: 3,
     id: slugify(title || "teaching-project"),
     title: title.trim() || "新建教学工程",
+    tags: [],
     artist: "",
     lyricist: "",
     composer: "",
@@ -132,6 +177,11 @@ export function createProjectPhrase(
     morphology: morphology.tokens,
     kind: "vocal",
     voiceLine: "",
+    lyricJpwabc: morphology.referenceReading,
+    lyricCells: [],
+    keyOfOne: "",
+    keyChanges: [],
+    frame: undefined,
     annotation: "",
     showMetronome: true,
     skipDuringPlayback: false
