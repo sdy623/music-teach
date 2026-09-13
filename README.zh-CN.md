@@ -8,9 +8,9 @@ JPW-ABC 是当前的一等乐谱输入适配器，简谱是第一套渲染器，
 
 本项目面向音乐教唱视频、课堂幻灯片和逐句练习工具，不以复刻 JP-Word 编辑器或 A4 纸张版面为目标。屏幕模式只缩放稳定的教学画面；宿主应用可以按音符槽位控制高亮、播放进度和教学 overlay。
 
-仓库只附带公版民歌示例和人工合成的记谱测试样例。受许可约束或私人使用的曲目应作为本地 `.jpwabc`/教学工程 JSON 导入，不应作为组件库源码提交。
+公开版只保留公版民歌示例和人工合成的记谱样例；其他曲目可以在本机导入。
 
-`v0.2.0` 新增教学工程 JSON 无损往返、逐句 JPW-ABC 编辑、标题人员信息与标签、按段落绘制的全曲进度、按实际时值调度的播放、词级 ruby 数据，以及从乐句播放器直接导出工程。
+v0.3.0 加入本机工程库、导入预检、版本冲突保护、恢复草稿、检查点和附件，并参考 jpeditor 重构连音线、增时线与减时线。旧版乐句编辑器及播放器继续可用。详见[更新记录](CHANGELOG.md)和[工程库指南](docs/project-library.md)。
 
 ## 处理管线
 
@@ -36,30 +36,41 @@ npm ci
 npm run dev
 ```
 
-打开 `http://127.0.0.1:5173/scores/sakura`。
+打开 `http://localhost:5173/library`。
 
 - `/scores/sakura/phrases/1`：显示一个教学乐句
 - `/scores/sakura/sections`：编辑段落分割点
 - `/scores/notation-reference`：记谱规范回归样例
 - `/scores/rhythm-x`：无音高节奏样例
-- `/projects/new`：新建或导入教学工程
+- `/scores/im-eul-wihan-haengjingok`：《임을 위한 행진곡》韩语教学占位
+- `/library`：浏览、导入、复制、归档和恢复工程
+- `/projects/new`：先保存空白谱，再进入工程信息与预览页
+- `/legacy/projects/new`：使用已有乐句编辑器及工程播放器
 
 ```bash
 npm run test
 npm run build
+npm run build:web
+npm run build:webview
+npm run build:pages
+npm run build:cloudflare
 npm run build:lib
 ```
+
+工程库使用当前浏览器的 IndexedDB 保存工程。导入先预检，再明确确认保存；修改工程信息时显示保存状态与版本。旧版编辑器独立保存，“播放当前工程”可在刷新后恢复同一份旧版工程。
+
+默认 `build` 输出可放入任意二级目录的 `dist`，资源使用相对路径并通过 hash 路由导航。`build:web`、`build:webview` 和 `build:pages` 分别输出 `dist-web`、`dist-webview`、`dist-pages`，都不需要预先知道仓库名；Pages 地址形如 `/music-teach/#/scores/sakura`。`build:cloudflare` 输出使用 history 路由和 SPA 回退的 `dist-cloudflare`。`build:all` 会生成全部产物，但不会自动发布。
 
 完整流程见 [中文入门教程](docs/getting-started.zh-CN.md)，英文版见 [Getting started](docs/getting-started.md)。
 
 ## 导入曲目
 
-进入 **新建教学工程** 后可以导入：
+在工程库点击 **导入工程**，预检 JPW-ABC、MusicProject 或导出的工程包，再确认导入。迁入 v3 教学工程需要配对 JPW-ABC 作为原始乐谱。
+
+需要沿用逐句编辑流程时，打开 **旧版编辑器**，可以导入：
 
 - `.jpwabc` 文件：自动解码、解析并转换为可编辑教学工程；
-- `.teaching-project.json` 或导出的 `.json`：恢复标题、人员信息、标签、歌词原文、读音与 ruby 数据、逐句简谱、歌词音位、转调、器乐过门、注释、播放开关和段落分割点。
-
-同一工程导出后再导入时，会保留渲染乐句快照和教学时间轴，不再重新猜测一字多音或句末休止。
+- `.teaching-project.json` 或导出的 `.json`：恢复标题、人员信息、逐句简谱、注释、播放开关和段落分割点。
 
 歌词按乐谱槽位对齐。`ー` 会消耗一个演唱槽位，但不会进入 `normalizedText`；花括号中的多个字符占用一个音位。未知符号会进入 diagnostics，而不是令整页崩溃。
 
@@ -122,17 +133,20 @@ Slidev 接入见 [中文教程](docs/slidev-integration.zh-CN.md) 或 [English g
 
 ## 当前限制
 
+- 新工程库支持信息编辑和只读谱面预览；音符、歌词及教学编排的撤销/重做编辑计划在 M3 接入。旧版乐句编辑器独立保留。
+- 工程按浏览器 origin 保存在本机；清理站点数据前需先导出备份，目前没有云同步。
 - 不是 JP-Word 编辑器，也不追求纸张像素级复刻。
 - 和弦、装饰音细节、复杂附件和多声部仍不完整。
 - 自动语言学分析不属于当前记谱核心。
 - `StaffRenderer` 仍是预留接口。
-- 暂不发布到 npm registry；正式源码版本通过 GitHub Releases 发布。
+- npm 包在确定正式名称和版本前仍标记为 `private`。
 
 ## 样例
 
 - `public/fixtures/sakura.jpwabc`：公版民歌 smoke test
 - `public/fixtures/notation-reference.jpwabc`：人工合成的记谱规范样例
 - `public/fixtures/rhythm-x.jpwabc`：人工合成的无音高节奏样例
+- `public/fixtures/im-eul-wihan-haengjingok-placeholder.jpwabc`：仅保留稳定曲目 ID 与合成占位节奏，不含原曲旋律或歌词
 
 新增可再分发样例时，请放入 `public/fixtures/`，登记到 `src/demo/fixtures.ts`，并写明来源与许可证。
 
@@ -145,6 +159,6 @@ Slidev 接入见 [中文教程](docs/slidev-integration.zh-CN.md) 或 [English g
 | 架构 | [Teaching slide architecture](docs/teaching-slide-architecture.md) | 当前为中文优先 |
 | 记谱约束 | [Jianpu conformance](docs/jianpu-notation-conformance.md) | 当前为中文优先 |
 
-## 许可证
+## 发布许可证
 
-项目源码采用 GPL-3.0-only。第三方组件保留各自许可证，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+项目源码采用 GPL-3.0-only。第三方组件保留各自许可证，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。jpeditor 改编部分保留完整 MIT 许可；简谱数字使用随库提供的 Noto 开放字体。

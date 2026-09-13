@@ -2,11 +2,8 @@
 import { computed } from "vue";
 import type { PhraseSlot, JianpuPhraseFrame } from "./types";
 import { layoutPhrase } from "./layoutPhrase";
-import {
-  highOctaveDotY,
-  JIANPU_METRICS,
-  lowOctaveDotY
-} from "../notation/jianpuRules";
+import { JIANPU_METRICS } from "../notation/jianpuRules";
+import { octaveY } from "../notation/engravingGeometry";
 import {
   accidentalGlyph,
   barlineGlyphGeometry,
@@ -14,7 +11,7 @@ import {
   splitKeyOfOne,
   timeSignatureText
 } from "../notation/smufl";
-import { roundedArcPath, roundedTupletArcPaths } from "./curvePath";
+import { roundedTupletArcPaths } from "./curvePath";
 
 const props = withDefaults(
   defineProps<{
@@ -276,7 +273,9 @@ function keyShiftText(semitoneShift: number | undefined): string {
         </template>
         <path
           v-else
-          :d="roundedArcPath(curve)"
+          class="engraved-curve"
+          :data-curve-mode="curve.mode"
+          :d="curve.d"
         />
       </g>
     </g>
@@ -316,41 +315,39 @@ function keyShiftText(semitoneShift: number | undefined): string {
           <text
             v-if="slotGeometry.slot.kind !== 'sustain'"
             class="phrase-digit"
+            :style="{ fontSize: `${geometry.engraving.em}px` }"
             :x="slotGeometry.x"
             :y="geometry.noteY"
           >{{ slotText(slotGeometry.slot) }}</text>
-          <line
+          <path
             v-else
             class="phrase-augmentation-line"
-            :x1="slotGeometry.x - JIANPU_METRICS.digitHalfWidth"
-            :x2="slotGeometry.x + JIANPU_METRICS.digitHalfWidth"
-            :y1="geometry.noteY + JIANPU_METRICS.durationDotYOffset"
-            :y2="geometry.noteY + JIANPU_METRICS.durationDotYOffset"
+            :d="slotGeometry.augmentation.d"
           />
 
           <circle
             v-for="dotIndex in Math.max(0, slotGeometry.slot.octave)"
             :key="`high-${dotIndex}`"
             class="phrase-octave-dot"
-            :cx="slotGeometry.x"
-            :cy="highOctaveDotY(dotIndex - 1, geometry.noteY)"
-            r="3.4"
+            :cx="slotGeometry.symbolX"
+            :cy="octaveY(dotIndex - 1, 1, 0, geometry.noteY, geometry.engraving)"
+            :r="geometry.engraving.dotRadius"
           />
           <circle
             v-for="dotIndex in Math.max(0, -slotGeometry.slot.octave)"
             :key="`low-${dotIndex}`"
             class="phrase-octave-dot"
-            :cx="slotGeometry.x"
-            :cy="lowOctaveDotY(dotIndex - 1, slotGeometry.slot.underlines, geometry.noteY)"
-            r="3.4"
+            :cx="slotGeometry.symbolX"
+            :cy="octaveY(dotIndex - 1, -1, slotGeometry.slot.underlines, geometry.noteY, geometry.engraving)"
+            :r="geometry.engraving.dotRadius"
           />
           <circle
             v-for="dotIndex in slotGeometry.slot.dots"
             :key="`duration-${dotIndex}`"
             class="phrase-duration-dot"
             :cx="slotGeometry.x + JIANPU_METRICS.durationDotXOffset + (dotIndex - 1) * JIANPU_METRICS.durationDotGap"
-            :cy="geometry.noteY + JIANPU_METRICS.durationDotYOffset"
-            r="3"
+            :cy="geometry.noteY + (geometry.engraving.digitTop + geometry.engraving.digitBottom) / 2"
+            :r="geometry.engraving.dotRadius"
           />
         </g>
 
@@ -373,13 +370,11 @@ function keyShiftText(semitoneShift: number | undefined): string {
     </g>
 
     <g class="phrase-beams" aria-hidden="true">
-      <line
+      <path
         v-for="beam in geometry.beams"
         :key="beam.id"
-        :x1="beam.x1"
-        :x2="beam.x2"
-        :y1="beam.y"
-        :y2="beam.y"
+        :data-level="beam.level"
+        :d="beam.d"
       />
     </g>
   </svg>

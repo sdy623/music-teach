@@ -1,12 +1,97 @@
 import type {
   JianpuPhraseFrame,
   PhraseKeyChange,
-  PhraseLyricCell
+  PhraseLyricCell,
+  PhraseTeachingContent
 } from "../slide/types";
+import { parseJPWABC } from "../parser/parseJPWABC";
+import { buildLessonDeck } from "../slide/buildLessonDeck";
+import { buildPhraseJPWABC } from "../teaching/lesson";
 import type {
+  MorphologyToken,
   TeachingProjectKeyChange,
   TeachingProjectLyricCell
 } from "./types";
+
+export interface RenderableProjectPhraseInput {
+  phrase?: JianpuPhraseFrame;
+  sourceText?: string;
+  voiceLine?: string;
+  lyricText?: string;
+  lyricJpwabc?: string;
+  lyricCells?: readonly TeachingProjectLyricCell[];
+  referenceReading?: string;
+  morphology?: readonly MorphologyToken[];
+  keyOfOne?: string;
+  keyChanges?: readonly TeachingProjectKeyChange[];
+  title?: string;
+  keyAndMeters?: string;
+  expression?: string;
+  annotation?: string;
+  phraseIndex?: number;
+  teaching?: PhraseTeachingContent;
+}
+
+export function buildRenderableProjectPhrase(
+  input: RenderableProjectPhraseInput
+): JianpuPhraseFrame | undefined {
+  const sourceText = input.sourceText?.trim()
+    ? input.sourceText
+    : input.voiceLine?.trim()
+      ? buildPhraseJPWABC({
+          title: input.title || "教学乐句",
+          keyAndMeters: input.keyAndMeters || "1=C,4/4",
+          expression: input.expression || "J=80",
+          voice: input.voiceLine,
+          words:
+            input.lyricJpwabc || input.referenceReading || input.lyricText || ""
+        })
+      : "";
+
+  let base = input.phrase;
+  if (!base && sourceText) {
+    try {
+      base = buildLessonDeck(parseJPWABC(sourceText).value, {
+        id: "project-phrase"
+      }).phrases[0];
+    } catch {
+      base = undefined;
+    }
+  }
+  if (!base) return undefined;
+
+  base = restoreProjectPhraseSemantics(
+    base,
+    input.lyricCells ?? [],
+    input.keyChanges ?? [],
+    input.keyOfOne
+  );
+
+  const morphology = input.morphology ?? [];
+  return {
+    ...base,
+    index: input.phraseIndex ?? base.index,
+    title: input.title || base.title,
+    teaching: {
+      ...base.teaching,
+      ...input.teaching,
+      originalText:
+        input.lyricText || input.teaching?.originalText || base.teaching?.originalText,
+      surface: input.lyricText || input.teaching?.surface || base.teaching?.surface,
+      reading:
+        input.referenceReading || input.teaching?.reading || base.teaching?.reading,
+      rubyTokens: morphology.length
+        ? morphology.map((token) => ({
+            id: token.id,
+            surface: token.surface,
+            reading: token.needsReview ? undefined : token.reading
+          }))
+        : input.teaching?.rubyTokens ?? base.teaching?.rubyTokens,
+      coachNote:
+        input.annotation || input.teaching?.coachNote || base.teaching?.coachNote
+    }
+  };
+}
 
 export function restoreProjectPhraseSemantics(
   frame: JianpuPhraseFrame,

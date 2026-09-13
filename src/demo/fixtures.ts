@@ -19,6 +19,12 @@ export const demoFixtures: DemoFixture[] = [
     tags: ["REFERENCE"]
   },
   {
+    id: "im-eul-wihan-haengjingok",
+    label: "임을 위한 행진곡（韩语占位）",
+    path: "/fixtures/im-eul-wihan-haengjingok-placeholder.jpwabc",
+    tags: ["KOREAN", "GWANGJU", "PLACEHOLDER"]
+  },
+  {
     id: "rhythm-x",
     label: "Rhythm X",
     path: "/fixtures/rhythm-x.jpwabc",

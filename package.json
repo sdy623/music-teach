@@ -2,15 +2,20 @@
   "name": "music-teach",
   "description": "Vue 3 and SVG components for phrase-by-phrase music teaching, with JPW-ABC import and jianpu rendering.",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "license": "GPL-3.0-only",
   "type": "module",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
   },
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "vue-tsc -b && vite build",
+    "dev": "vite --host localhost --strictPort",
+    "build": "vue-tsc -b && vite build --config vite.portable.config.ts",
+    "build:web": "vue-tsc -b && vite build --config vite.web.config.ts",
+    "build:webview": "vue-tsc -b && vite build --config vite.webview.config.ts",
+    "build:pages": "vue-tsc -b && vite build --config vite.pages.config.ts",
+    "build:cloudflare": "vue-tsc -b && vite build --config vite.cloudflare.config.ts && node scripts/prepare-cloudflare-build.mjs",
+    "build:all": "npm run build:web && npm run build:webview && npm run build:pages && npm run build:cloudflare",
     "build:lib": "vite build --config vite.lib.config.ts && vue-tsc -p tsconfig.lib.json",
     "glyphs:extract": "node scripts/extract-score-glyphs.mjs",
     "test": "vitest run",
@@ -34,7 +39,9 @@
     "vue-tsc": "^2.2.10"
   },
   "files": [
-    "dist-lib"
+    "dist-lib",
+    "THIRD_PARTY_NOTICES.md",
+    "public/sparks-core-resources/font/noto_sans_display_extra_bold/OFL.txt"
   ],
   "module": "./dist-lib/music-teach.js",
   "types": "./dist-lib/types/index.d.ts",

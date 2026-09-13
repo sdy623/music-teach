@@ -1,0 +1,127 @@
+{
+  "formatVersion": 3,
+  "id": "legacy-f0a-fixture",
+  "title": "F0-A Golden",
+  "tags": ["golden", "neo"],
+  "artist": "Fixture Singer",
+  "lyricist": "Fixture Lyricist",
+  "composer": "Fixture Composer",
+  "arranger": "Fixture Arranger",
+  "otherCredits": "Fixture Credit",
+  "keyAndMeters": "1=C,4/4",
+  "expression": "J=96",
+  "sourceLyrics": "あいう",
+  "phrases": [
+    {
+      "id": "legacy-phrase-1",
+      "lyricText": "あいう",
+      "referenceReading": "あいう",
+      "morphology": [
+        {
+          "id": "morph-1",
+          "surface": "あいう",
+          "reading": "あいう",
+          "needsReview": false,
+          "futureMorph": { "confidence": 0.75 }
+        }
+      ],
+      "kind": "vocal",
+      "voiceLine": "1_ 0_ {(3} 2 3 4 ) |",
+      "lyricJpwabc": "{あい}うー",
+      "lyricCells": [
+        {
+          "id": "legacy-cell-1",
+          "kind": "multiChar",
+          "raw": "{あい}",
+          "display": "あい",
+          "normalizedText": "あい",
+          "tokenId": "legacy-token-1",
+          "slotIndex": 0,
+          "futureCell": { "source": "golden" }
+        },
+        {
+          "id": "legacy-cell-2",
+          "kind": "extension",
+          "raw": "ー",
+          "display": "ー",
+          "normalizedText": "ー",
+          "inheritedTokenId": "legacy-token-1",
+          "slotIndex": 2
+        }
+      ],
+      "keyOfOne": "C",
+      "keyChanges": [
+        {
+          "id": "legacy-key-change-1",
+          "slotIndex": 2,
+          "keyOfOne": "D",
+          "display": "转1=D",
+          "semitoneShift": 2,
+          "futureKeyChange": { "notation": "keep" }
+        }
+      ],
+      "frame": {
+        "id": "legacy-frame-1",
+        "index": 0,
+        "sourceBlockId": "legacy-source-block",
+        "title": "F0-A Golden",
+        "keyOfOne": "C",
+        "titleMeter": { "numerator": 4, "denominator": 4 },
+        "sourceAnchor": {
+          "startMeasure": 1,
+          "startNote": 1,
+          "endMeasure": 1,
+          "endNote": 4
+        },
+        "lyricCells": [],
+        "measures": [
+          {
+            "number": 1,
+            "tuplet": { "count": 3 },
+            "futureMeasure": true
+          }
+        ],
+        "slots": [
+          {
+            "id": "legacy-slot-note",
+            "kind": "note",
+            "raw": "1_",
+            "durationQuarters": 0.5,
+            "tieGhost": true,
+            "futureSlot": { "keep": [1, 2, 3] }
+          },
+          {
+            "id": "legacy-slot-rest",
+            "kind": "rest",
+            "raw": "0_",
+            "durationQuarters": 0.5
+          }
+        ],
+        "curves": [],
+        "keyChanges": [],
+        "vendorFrame": { "nested": { "keep": "exactly" } }
+      },
+      "annotation": "Golden annotation",
+      "showMetronome": true,
+      "skipDuringPlayback": false,
+      "futurePhrase": { "nested": ["keep", 42] }
+    }
+  ],
+  "sectionBreaks": [
+    {
+      "phraseId": "legacy-phrase-1",
+      "section": "verse",
+      "futureBreak": { "color": "blue" }
+    }
+  ],
+  "customSections": [
+    {
+      "id": "custom:coda",
+      "label": "Coda",
+      "futureSection": 7
+    }
+  ],
+  "futureTop": {
+    "nested": ["keep", { "value": 42 }]
+  }
+}

@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "MusicTeachDigits";
+  src: url("../../public/sparks-core-resources/font/noto_sans_display_extra_bold/noto_sans_display_extra_bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 800;
+  font-display: block;
+}
+
 .slide-studio {
   --studio-bg: #020408;
   --studio-panel: #07101a;
@@ -1015,6 +1023,11 @@
   stroke-linejoin: round;
 }
 
+.phrase-curves .engraved-curve {
+  fill: var(--score-ink);
+  stroke: none;
+}
+
 .phrase-curves text {
   fill: var(--score-ink);
   font-family: Arial, sans-serif;
@@ -1048,9 +1061,9 @@
 
 .phrase-digit {
   fill: var(--score-ink);
-  font-family: "JPFontNDSBMN", Arial, sans-serif;
+  font-family: "MusicTeachDigits", sans-serif;
   font-size: 43px;
-  font-weight: 400;
+  font-weight: 800;
   text-anchor: middle;
 }
 
@@ -1061,7 +1074,6 @@
 
 .phrase-slot.is-rhythm .phrase-digit {
   fill: #147b73;
-  font-family: Arial, sans-serif;
 }
 
 .phrase-slot.is-sustain .phrase-digit {
@@ -1079,9 +1091,8 @@
 }
 
 .phrase-augmentation-line {
-  stroke: var(--score-ink);
-  stroke-width: 2.4;
-  stroke-linecap: butt;
+  fill: var(--score-ink);
+  stroke: none;
 }
 
 .phrase-octave-dot,
@@ -1089,10 +1100,9 @@
   fill: var(--score-ink);
 }
 
-.phrase-beams line {
-  stroke: var(--score-ink);
-  stroke-width: 2.4;
-  stroke-linecap: butt;
+.phrase-beams path {
+  fill: var(--score-ink);
+  stroke: none;
 }
 
 .phrase-score-lyric {
@@ -1118,19 +1128,6 @@
 
 .jianpu-lesson-slide.is-instrumental-slide .phrase-accidental {
   font-size: 24px;
-}
-
-.jianpu-lesson-slide.is-instrumental-slide .phrase-octave-dot {
-  r: 2.4px;
-}
-
-.jianpu-lesson-slide.is-instrumental-slide .phrase-duration-dot {
-  r: 2.2px;
-}
-
-.jianpu-lesson-slide.is-instrumental-slide .phrase-beams line,
-.jianpu-lesson-slide.is-instrumental-slide .phrase-augmentation-line {
-  stroke-width: 1.9;
 }
 
 .lesson-language-band {

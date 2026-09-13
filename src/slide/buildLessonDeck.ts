@@ -2,6 +2,7 @@ import type { ScoreIR } from "../ir/score";
 import type { LyricBlock, LyricCell } from "../ir/lyric";
 import type { BarlineEvent, MeterEvent, NoteEvent, RestEvent, RhythmEvent, VoiceEvent } from "../ir/voice";
 import { estimateEventWidth } from "../layout/horizontalSpacing";
+import { buildEventTiming, type EventTiming } from "../notation/eventTiming";
 import {
   durationWithoutAugmentation,
   locateBeat,
@@ -26,14 +27,6 @@ import type {
   PhraseMeasure,
   PhraseSlot
 } from "./types";
-
-interface EventTiming {
-  measureOffsetQuarter: number;
-  durationQuarters: number;
-  durationScale: number;
-  numerator: number;
-  denominator: number;
-}
 
 interface AlignedCell {
   cell: LyricCell;
@@ -1125,65 +1118,6 @@ function buildPhraseCurves(score: ScoreIR, events: VoiceEvent[]): PhraseCurve[] 
   return curves;
 }
 
-function buildEventTiming(events: VoiceEvent[], score: ScoreIR): Map<string, EventTiming> {
-  const result = new Map<string, EventTiming>();
-  const initial = initialKeyMeter(score);
-  let numerator = initial.numerator;
-  let denominator = initial.denominator;
-  let measure = events[0]?.measure ?? 1;
-  let measureCursorQuarter = 0;
-  let activeTuplet: { count: number; writtenQuarters: number } | undefined;
-
-  for (const event of events) {
-    if ((event.measure ?? measure) !== measure) {
-      measure = event.measure ?? measure + 1;
-      measureCursorQuarter = 0;
-    }
-    if (event.kind === "meter") {
-      activeTuplet = undefined;
-      numerator = event.numerator;
-      denominator = event.denominator;
-      continue;
-    }
-    if (event.kind === "tupletMarker") {
-      activeTuplet = { count: event.count, writtenQuarters: 0 };
-      continue;
-    }
-    if (event.kind === "barline" || event.kind === "return" || event.kind === "standardText") {
-      activeTuplet = undefined;
-      continue;
-    }
-    if (event.kind === "slurMarker" && event.role === "end") {
-      activeTuplet = undefined;
-      continue;
-    }
-    if (!isSlotEvent(event)) continue;
-
-    const writtenQuarters = totalDurationQuarters(event.duration);
-    const durationScale = activeTuplet ? tupletRealDurationRatio(activeTuplet.count) : 1;
-    const durationQuarters = writtenQuarters * durationScale;
-    result.set(event.id, {
-      measureOffsetQuarter: measureCursorQuarter,
-      durationQuarters,
-      durationScale,
-      numerator,
-      denominator
-    });
-    measureCursorQuarter += durationQuarters;
-    if (activeTuplet) {
-      activeTuplet.writtenQuarters += writtenQuarters;
-      if (
-        activeTuplet.writtenQuarters >=
-        tupletWrittenQuarterTarget(activeTuplet.count) - 1e-6
-      ) {
-        activeTuplet = undefined;
-      }
-    }
-  }
-
-  return result;
-}
-
 function collectTupletEvents(
   events: VoiceEvent[],
   startIndex: number,
@@ -1215,10 +1149,6 @@ function collectTupletEvents(
 
 function tupletWrittenQuarterTarget(count: number): number {
   return count / 2;
-}
-
-function tupletRealDurationRatio(count: number): number {
-  return count > 1 ? (count - 1) / count : 1;
 }
 
 function initialKeyMeter(score: ScoreIR): { keyOfOne: string; numerator: number; denominator: number } {

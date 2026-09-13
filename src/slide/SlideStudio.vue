@@ -134,7 +134,7 @@ async function loadScore(id: string): Promise<void> {
   status.value = "Loading JPWABC";
   const fixture = findFixture(id);
   try {
-    const response = await fetch(fixture.path);
+    const response = await fetch(publicAssetPath(fixture.path));
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
     const decoded = decodeJPWABCWithInfo(await response.arrayBuffer());
     const parsed = parseJPWABC(decoded.text).value;
@@ -430,6 +430,10 @@ function sectionDisplayLabel(section: string): string {
 function defaultSectionBreaks(lessonDeck: JianpuLessonDeck): Record<string, SectionId> {
   const firstVocal = lessonDeck.phrases.find((candidate) => candidate.kind !== "instrumental");
   return firstVocal ? { [firstVocal.id]: "verse" } : {};
+}
+
+function publicAssetPath(path: string): string {
+  return `${import.meta.env.BASE_URL}${path.replace(/^\/+/, "")}`;
 }
 
 function addCustomSection(): void {

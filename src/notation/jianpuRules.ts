@@ -1,4 +1,5 @@
 import type { DurationIR } from "../ir/voice";
+import { octaveY, reductionY, PHRASE_ENGRAVING } from "./engravingGeometry";
 
 export interface MeterBeatGroup {
   index: number;
@@ -18,16 +19,16 @@ export const JIANPU_METRICS = {
   digitHalfWidth: 13,
   noteY: 126,
   lyricY: 188,
-  firstUnderlineOffset: 8,
-  underlineGap: 6,
-  underlineStrokeWidth: 2.4,
-  highOctaveDotOffset: 38,
-  octaveDotGap: 8,
-  lowOctaveDotOffset: 10,
-  lowOctaveDotClearance: 8,
+  firstUnderlineOffset: reductionY(1, 0, PHRASE_ENGRAVING),
+  underlineGap: PHRASE_ENGRAVING.beamGap,
+  underlineStrokeWidth: PHRASE_ENGRAVING.lineWidth,
+  highOctaveDotOffset: -octaveY(0, 1, 0, 0, PHRASE_ENGRAVING),
+  octaveDotGap: PHRASE_ENGRAVING.aboveGap + 2 * PHRASE_ENGRAVING.dotRadius,
+  lowOctaveDotOffset: octaveY(0, -1, 0, 0, PHRASE_ENGRAVING),
+  lowOctaveDotClearance: PHRASE_ENGRAVING.belowGap,
   durationDotXOffset: 16,
   durationDotGap: 8,
-  durationDotYOffset: -13,
+  durationDotYOffset: (PHRASE_ENGRAVING.digitTop + PHRASE_ENGRAVING.digitBottom) / 2,
   barlineTop: 91,
   barlineBottom: 164,
   repeatDotOffset: 13
@@ -95,11 +96,11 @@ export function locateBeat(
 }
 
 export function underlineY(level: number, noteY: number = JIANPU_METRICS.noteY): number {
-  return noteY + JIANPU_METRICS.firstUnderlineOffset + (level - 1) * JIANPU_METRICS.underlineGap;
+  return reductionY(level, noteY, PHRASE_ENGRAVING);
 }
 
 export function highOctaveDotY(dotIndex: number, noteY: number = JIANPU_METRICS.noteY): number {
-  return noteY - JIANPU_METRICS.highOctaveDotOffset - dotIndex * JIANPU_METRICS.octaveDotGap;
+  return octaveY(dotIndex, 1, 0, noteY, PHRASE_ENGRAVING);
 }
 
 export function lowOctaveDotY(
@@ -107,12 +108,5 @@ export function lowOctaveDotY(
   underlineCount: number,
   noteY: number = JIANPU_METRICS.noteY
 ): number {
-  const clearDigit = noteY + JIANPU_METRICS.lowOctaveDotOffset;
-  const clearUnderlines =
-    underlineCount > 0
-      ? underlineY(underlineCount, noteY) +
-        JIANPU_METRICS.underlineStrokeWidth / 2 +
-        JIANPU_METRICS.lowOctaveDotClearance
-      : clearDigit;
-  return Math.max(clearDigit, clearUnderlines) + dotIndex * JIANPU_METRICS.octaveDotGap;
+  return octaveY(dotIndex, -1, underlineCount, noteY, PHRASE_ENGRAVING);
 }

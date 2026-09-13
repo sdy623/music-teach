@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
 import vue from "@vitejs/plugin-vue";
 import { defineConfig } from "vite";
 import { fileURLToPath, URL } from "node:url";
+
+const thirdPartyNotice = "/*!\n" + readFileSync(new URL("./THIRD_PARTY_NOTICES.md", import.meta.url), "utf8") + "\n*/";
 
 export default defineConfig({
   plugins: [vue()],
@@ -26,6 +29,7 @@ export default defineConfig({
     rollupOptions: {
       external: ["vue"],
       output: {
+        banner: thirdPartyNotice,
         assetFileNames: (assetInfo) =>
           assetInfo.name === "style.css"
             ? "music-teach.css"

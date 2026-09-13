@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { parseJPWABC } from "../parser/parseJPWABC";
-import { buildLessonDeck } from "../slide/buildLessonDeck";
 import JianpuLessonSlide from "../slide/JianpuLessonSlide.vue";
 import type {
   JianpuPhraseFrame,
@@ -10,8 +8,7 @@ import type {
   TeachingHighlightPalette,
   TeachingMark
 } from "../slide/types";
-import { buildPhraseJPWABC } from "../teaching/lesson";
-import { restoreProjectPhraseSemantics } from "./projectPhraseSemantics";
+import { buildRenderableProjectPhrase } from "./projectPhraseSemantics";
 import type {
   MorphologyToken,
   TeachingProjectKeyChange,
@@ -83,59 +80,28 @@ const emit = defineEmits<{
   "select-slot": [slot: PhraseSlot, index: number];
 }>();
 
-const generatedSource = computed(() => {
-  if (props.sourceText.trim()) return props.sourceText;
-  if (!props.voiceLine.trim()) return "";
-  return buildPhraseJPWABC({
+const renderedPhrase = computed<JianpuPhraseFrame | undefined>(() =>
+  buildRenderableProjectPhrase({
+    phrase: props.phrase,
+    sourceText: props.sourceText,
+    voiceLine: props.voiceLine,
+    lyricText: props.lyricText,
+    lyricJpwabc: props.lyricJpwabc,
+    lyricCells: props.lyricCells,
+    referenceReading: props.referenceReading,
+    morphology: props.morphology,
+    keyOfOne: props.keyOfOne,
+    keyChanges: props.keyChanges,
     title: props.title,
     keyAndMeters: props.keyAndMeters,
     expression: props.expression,
-    voice: props.voiceLine,
-    words: props.lyricJpwabc || props.referenceReading || props.lyricText
-  });
-});
-
-const renderedPhrase = computed<JianpuPhraseFrame | undefined>(() => {
-  let base = props.phrase;
-  if (!base && generatedSource.value) {
-    try {
-      base = buildLessonDeck(parseJPWABC(generatedSource.value).value, {
-        id: "slidev-phrase"
-      }).phrases[0];
-    } catch {
-      base = undefined;
-    }
-  }
-  if (!base) return undefined;
-
-  base = restoreProjectPhraseSemantics(
-    base,
-    props.lyricCells,
-    props.keyChanges,
-    props.keyOfOne
-  );
-
-  return {
-    ...base,
-    index: props.phraseIndex ?? base.index,
-    title: props.title || base.title,
-    teaching: {
-      ...base.teaching,
-      originalText: props.lyricText || base.teaching?.originalText,
-      surface: props.lyricText || base.teaching?.surface,
-      reading: props.referenceReading || base.teaching?.reading,
-      rubyTokens: props.morphology.length
-        ? props.morphology.map((token) => ({
-            id: token.id,
-            surface: token.surface,
-            reading: token.needsReview ? undefined : token.reading
-          }))
-        : base.teaching?.rubyTokens,
-      marks: props.teachingMarks.length ? [...props.teachingMarks] : base.teaching?.marks,
-      coachNote: props.annotation || base.teaching?.coachNote
-    }
-  };
-});
+    annotation: props.annotation,
+    phraseIndex: props.phraseIndex,
+    teaching: props.teachingMarks.length
+      ? { marks: [...props.teachingMarks] }
+      : undefined
+  })
+);
 
 function forwardSlot(slot: PhraseSlot, index: number): void {
   emit("select-slot", slot, index);

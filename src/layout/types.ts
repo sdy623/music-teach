@@ -138,12 +138,19 @@ export interface PathItem extends BaseLayoutItem {
   d: string;
   strokeWidth: number;
   className?: string;
+  filled?: boolean;
+  curveId?: string;
+  curveMode?: "arc" | "flat";
+  continuedLeft?: boolean;
+  continuedRight?: boolean;
 }
 
 export interface BeamItem extends BaseLayoutItem {
   kind: "beam";
   d: string;
   className?: string;
+  level?: number;
+  eventIds?: string[];
 }
 
 export interface AttachmentItem extends BaseLayoutItem {

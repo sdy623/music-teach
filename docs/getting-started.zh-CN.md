@@ -19,13 +19,13 @@ npm ci
 npm run dev
 ```
 
-打开 `http://127.0.0.1:5173/projects/new`。Vite 默认绑定 `127.0.0.1`，因此开发服务只在当前电脑本地可见。
+打开 `http://localhost:5173/library` 进入本机工程库。导入预检、草稿、检查点和恢复见[工程库指南](project-library.md)。下文的逐句编辑流程使用 `/legacy/projects/new`。Vite 绑定 localhost 并固定端口；默认端口被占用时可运行 `npm run dev -- --port 5174`。
 
 ## 2. 导入 JPW-ABC
 
 教学工程页面支持 `.jpwabc`、`.abc` 和已经导出的 JSON 工程。
 
-1. 打开 **新建教学工程**。
+1. 打开 **旧版编辑器**（`/legacy/projects/new`）。
 2. 选择 **导入**，选取 JPW-ABC 文件。
 3. 检查识别出的编码、乐句数和 diagnostics。
 4. 核对标题、歌手、作词、作曲、编曲、调号拍号和速度表情。

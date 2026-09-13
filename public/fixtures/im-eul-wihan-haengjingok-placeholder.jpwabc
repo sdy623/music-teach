@@ -1,0 +1,26 @@
+// Placeholder fixture only. It contains no melody or lyrics from the song.
+.Options
+Paper = 210, 297, 18, 18, 16, 16
+
+.Fonts
+
+.Title
+Intro = Korean lesson placeholder
+Title = 임을 위한 행진곡
+SubTitle = 광주 · 한국어 수업 예제 자리
+SubTitle2 =
+KeyAndMeters = {4/4}
+WordsByAndMusicBy =
+Expression = Content pending
+LinePos = 0.0, 0.0, 16.0, 23.0, 16.0, 16.0, 20.0
+
+.Voice
+4/4 | X--- ||
+
+.Words
+W1@1,1:
+{준비중}
+
+.Attachments
+
+.Page

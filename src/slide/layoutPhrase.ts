@@ -5,10 +5,10 @@ import type {
   PhraseSlot
 } from "./types";
 import type { BarlineEvent } from "../ir/voice";
-import {
-  JIANPU_METRICS,
-  underlineY
-} from "../notation/jianpuRules";
+import { JIANPU_METRICS } from "../notation/jianpuRules";
+import { augmentationStroke, contiguousBeamRuns, engravedCurve, engravingStyle, horizontalStroke,
+  notationTop, reductionY, type EngravedLine, type EngravingStyle, type InkBox } from "../notation/engravingGeometry";
+import { phraseDigitInk } from "../notation/notationProfiles";
 
 export interface PhraseLayoutOptions {
   width?: number;
@@ -32,6 +32,9 @@ export interface SlotGeometry {
   x: number;
   beatX: number;
   beatWidth: number;
+  ink: InkBox;
+  symbolX: number;
+  augmentation: EngravedLine;
 }
 
 export interface MeasureGeometry {
@@ -55,6 +58,7 @@ export interface BeamGeometry {
   x1: number;
   x2: number;
   y: number;
+  d: string;
 }
 
 export interface CurveGeometry {
@@ -65,6 +69,8 @@ export interface CurveGeometry {
   baseY: number;
   apexY: number;
   labelY: number;
+  d?: string;
+  mode?: "arc" | "flat";
 }
 
 export interface KeyChangeGeometry {
@@ -79,6 +85,7 @@ export interface PhraseGeometry {
   contextWidth: number;
   noteY: number;
   lyricY: number;
+  engraving: EngravingStyle;
   beats: BeatGeometry[];
   slots: SlotGeometry[];
   measures: MeasureGeometry[];
@@ -98,6 +105,7 @@ export function layoutPhrase(phrase: JianpuPhraseFrame, options: PhraseLayoutOpt
   const height = options.height ?? DEFAULT_HEIGHT;
   const contextWidth = options.contextWidth ?? DEFAULT_CONTEXT_WIDTH;
   const compact = phrase.layoutDensity === "compact";
+  const engraving = engravingStyle(phrase.kind === "instrumental" ? 24 : JIANPU_METRICS.digitFontSize);
   const left = contextWidth + (compact ? 30 : 16);
   const right = compact ? 44 : 30;
   const beatGap = compact ? 5 : 8;
@@ -139,12 +147,12 @@ export function layoutPhrase(phrase: JianpuPhraseFrame, options: PhraseLayoutOpt
   });
 
   const slotOrder = new Map(phrase.slots.map((slot, index) => [slot.id, index]));
-  const slots = beats.flatMap((beatGeometry) => {
+  const positionedSlots = beats.flatMap((beatGeometry) => {
     const beat = phrase.measures
       .find((measure) => measure.number === beatGeometry.measure)
       ?.beats.find((candidate) => candidate.index === beatGeometry.index);
     const beatSlots = beat?.slots ?? [];
-    const positioned = beatSlots.map((slot, slotIndex): SlotGeometry => {
+    const positioned = beatSlots.map((slot, slotIndex): PositionedSlot => {
       const innerPadding = Math.min(16, beatGeometry.width * 0.12);
       const usableWidth = Math.max(0, beatGeometry.width - innerPadding * 2);
       const availableDuration = Math.max(0, 1 - slot.beatOffset);
@@ -164,6 +172,12 @@ export function layoutPhrase(phrase: JianpuPhraseFrame, options: PhraseLayoutOpt
       };
     });
     return resolveSlotCollisions(positioned, beatGeometry, compact);
+  });
+  const slots: SlotGeometry[] = positionedSlots.map((positioned) => {
+    const digit = positioned.slot.kind === "rest" ? "0" : String(positioned.slot.degree ?? "X");
+    const ink = phraseDigitInk(digit, positioned.x, JIANPU_METRICS.noteY, engraving);
+    return { ...positioned, ink, symbolX: (ink.left + ink.right) / 2,
+      augmentation: augmentationStroke(positioned.x, JIANPU_METRICS.noteY, engraving) };
   });
 
   const measures = phrase.measures.map((measure): MeasureGeometry => {
@@ -188,7 +202,7 @@ export function layoutPhrase(phrase: JianpuPhraseFrame, options: PhraseLayoutOpt
     };
   });
 
-  const beams = buildBeams(phrase, beats, slots);
+  const beams = buildBeams(phrase, beats, slots, engraving);
   const bySourceEvent = new Map<string, SlotGeometry>();
   slots.forEach((slotGeometry) => {
     if (slotGeometry.slot.kind !== "sustain" && !bySourceEvent.has(slotGeometry.slot.sourceEventId)) {
@@ -200,18 +214,19 @@ export function layoutPhrase(phrase: JianpuPhraseFrame, options: PhraseLayoutOpt
       const start = bySourceEvent.get(curve.startEventId);
       const end = bySourceEvent.get(curve.endEventId);
       if (!start || !end) return undefined;
-      const centerStart = Math.min(start.x, end.x);
-      const centerEnd = Math.max(start.x, end.x);
-      const x1 = centerStart - 10;
-      const x2 = centerEnd + 10;
-      const spanSlots = slots.filter((slot) => slot.x >= centerStart - 0.001 && slot.x <= centerEnd + 0.001);
+      const centerStart = Math.min(start.symbolX, end.symbolX);
+      const centerEnd = Math.max(start.symbolX, end.symbolX);
+      const x1 = centerStart;
+      const x2 = centerEnd;
+      const spanSlots = slots.filter((slot) => slot.symbolX >= centerStart - 0.001 && slot.symbolX <= centerEnd + 0.001);
       const highestOctave = Math.max(0, ...spanSlots.map((slot) => Math.max(0, slot.slot.octave)));
-      const baseY = JIANPU_METRICS.noteY - 46 - highestOctave * JIANPU_METRICS.octaveDotGap;
+      const baseY = notationTop(highestOctave, JIANPU_METRICS.noteY, engraving) - engraving.aboveGap;
       const width = Math.max(20, x2 - x1);
       const minimumRise = curve.type === "tie" ? 11 : 14;
       const maximumRise = curve.type === "tie" ? 19 : 27;
       const rise = clamp(width * (curve.type === "tie" ? 0.055 : 0.075), minimumRise, maximumRise);
-      const apexY = baseY - rise;
+      const apexY = curve.type === "tuplet" ? baseY - rise : engravedCurve(x1, x2, baseY, engraving,
+        { type: curve.type, noteCount: spanSlots.filter(slot => slot.slot.kind !== "sustain").length }).apexY;
       return {
         curve,
         x1,
@@ -223,7 +238,13 @@ export function layoutPhrase(phrase: JianpuPhraseFrame, options: PhraseLayoutOpt
       };
     })
     .filter((curve): curve is CurveGeometry => Boolean(curve));
-  const curves = stackCurveLanes(rawCurves);
+  const curves = stackCurveLanes(rawCurves, engraving).map((curve) => {
+    if (curve.curve.type === "tuplet") return curve;
+    return { ...curve, ...engravedCurve(curve.x1, curve.x2, curve.baseY, engraving, {
+      type: curve.curve.type, noteCount: slots.filter(slot => slot.slot.kind !== "sustain" &&
+        slot.symbolX >= curve.x1 - 0.001 && slot.symbolX <= curve.x2 + 0.001).length
+    }) };
+  });
   const keyChanges = phrase.keyChanges
     .map((change): KeyChangeGeometry | undefined => {
       const anchor = bySourceEvent.get(change.eventId);
@@ -246,6 +267,7 @@ export function layoutPhrase(phrase: JianpuPhraseFrame, options: PhraseLayoutOpt
     contextWidth,
     noteY: JIANPU_METRICS.noteY,
     lyricY: JIANPU_METRICS.lyricY,
+    engraving,
     beats,
     slots,
     measures,
@@ -258,7 +280,8 @@ export function layoutPhrase(phrase: JianpuPhraseFrame, options: PhraseLayoutOpt
 function buildBeams(
   phrase: JianpuPhraseFrame,
   beats: BeatGeometry[],
-  slots: SlotGeometry[]
+  slots: SlotGeometry[],
+  engraving: EngravingStyle
 ): BeamGeometry[] {
   const beams: BeamGeometry[] = [];
 
@@ -275,40 +298,22 @@ function buildBeams(
     const maxLevel = Math.max(0, ...beatSlots.map((entry) => entry.slot.underlines));
 
     for (let level = 1; level <= maxLevel; level += 1) {
-      const runs = beamRuns(beatSlots, level);
+      const runs = contiguousBeamRuns(beatSlots, level, entry => entry.slot.kind === "sustain" ? 0 : entry.slot.underlines);
       runs.filter((run) => run.length > 0).forEach((run, runIndex) => {
         const first = run[0]!;
         const last = run.at(-1)!;
-        const half = Math.min(JIANPU_METRICS.digitHalfWidth, beat.width * 0.18);
+        const stroke = horizontalStroke(Math.max(beat.x, first.ink.left), Math.min(beat.x + beat.width, last.ink.right),
+          reductionY(level, JIANPU_METRICS.noteY, engraving), engraving.lineWidth);
         beams.push({
           id: `${phrase.id}-${beat.id}-beam-${level}-${runIndex}`,
           level,
-          x1: Math.max(beat.x, first.x - half),
-          x2: Math.min(beat.x + beat.width, last.x + half),
-          y: underlineY(level)
+          ...stroke
         });
       });
     }
   }
 
   return beams;
-}
-
-function beamRuns(slots: SlotGeometry[], level: number): SlotGeometry[][] {
-  const runs: SlotGeometry[][] = [];
-  let current: SlotGeometry[] = [];
-
-  slots.forEach((slot) => {
-    if (slot.slot.kind === "sustain" || slot.slot.underlines < level) {
-      if (current.length) runs.push(current);
-      current = [];
-      return;
-    }
-    current.push(slot);
-  });
-
-  if (current.length) runs.push(current);
-  return runs;
 }
 
 function beatNaturalWeight(slots: PhraseSlot[], durationQuarters: number): number {
@@ -327,11 +332,13 @@ function beatNaturalWeight(slots: PhraseSlot[], durationQuarters: number): numbe
   return Math.max(1, durationQuarters * 0.9, 0.72 + glyphDemand * 0.42 + lyricDemand * 0.28);
 }
 
+type PositionedSlot = Omit<SlotGeometry, "ink" | "symbolX" | "augmentation">;
+
 function resolveSlotCollisions(
-  slots: SlotGeometry[],
+  slots: PositionedSlot[],
   beat: BeatGeometry,
   compact: boolean
-): SlotGeometry[] {
+): PositionedSlot[] {
   if (slots.length < 2) return slots;
   const minimumGap = compact ? 2 : 4;
   const digitHalfWidth = compact ? 8 : JIANPU_METRICS.digitHalfWidth;
@@ -380,28 +387,19 @@ function resolveSlotCollisions(
   return slots;
 }
 
-function stackCurveLanes(curves: CurveGeometry[]): CurveGeometry[] {
-  const occupied: Array<Array<{ x1: number; x2: number }>> = [];
-  return curves.map((curve) => {
-    let lane = 0;
-    while (
-      occupied[lane]?.some(
-        (candidate) => curve.x1 < candidate.x2 - 6 && curve.x2 > candidate.x1 + 6
-      )
-    ) {
-      lane += 1;
+function stackCurveLanes(curves: CurveGeometry[], engraving: EngravingStyle): CurveGeometry[] {
+  const placed: CurveGeometry[] = [];
+  for (const curve of [...curves].sort((a, b) => (a.x2 - a.x1) - (b.x2 - b.x1))) {
+    let baseY = curve.baseY;
+    for (const previous of placed) {
+      if (curve.x1 < previous.x2 && curve.x2 > previous.x1) {
+        baseY = Math.min(baseY, previous.apexY - engraving.aboveGap);
+      }
     }
-    occupied[lane] ??= [];
-    occupied[lane]!.push({ x1: curve.x1, x2: curve.x2 });
-    if (lane === 0) return curve;
-    const offset = lane * 12;
-    return {
-      ...curve,
-      baseY: curve.baseY - offset,
-      apexY: curve.apexY - offset,
-      labelY: curve.labelY - offset
-    };
-  });
+    const offset = baseY - curve.baseY;
+    placed.push({ ...curve, baseY, apexY: curve.apexY + offset, labelY: curve.labelY + offset });
+  }
+  return placed;
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {

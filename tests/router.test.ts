@@ -3,6 +3,13 @@ import { describe, expect, it } from "vitest";
 import { createAppRouter } from "../src/router";
 
 describe("SPA routes", () => {
+  it("opens the new library by default and retains a direct old editor entry", async () => {
+    const router = createAppRouter(createMemoryHistory());
+    await router.push("/");
+    expect(router.currentRoute.value.fullPath).toBe("/library");
+    await router.push("/legacy/projects/new");
+    expect(router.currentRoute.value.name).toBe("legacy-project-new");
+  });
   it("uses path routes for slides, section maps, and project creation", async () => {
     const router = createAppRouter(createMemoryHistory());
 
@@ -27,9 +34,26 @@ describe("SPA routes", () => {
 
     await router.push("/projects/new");
     expect(router.currentRoute.value.name).toBe("project-new");
+
+    await router.push("/projects/local-project/edit");
+    expect(router.currentRoute.value).toMatchObject({
+      name: "project-edit",
+      params: { projectId: "local-project" }
+    });
+
+    await router.push("/projects/local-project/phrases/2");
+    expect(router.currentRoute.value).toMatchObject({
+      name: "project-phrase",
+      params: { projectId: "local-project", phraseIndex: "2" }
+    });
+
+    await router.push("/projects/local-project");
+    expect(router.currentRoute.value.fullPath).toBe(
+      "/projects/local-project/phrases/0"
+    );
   });
 
-  it("migrates query links and safely ignores removed legacy flags", async () => {
+  it("migrates old query links into canonical SPA paths", async () => {
     const router = createAppRouter(createMemoryHistory());
 
     await router.push("/?score=rhythm-x&phrase=10");

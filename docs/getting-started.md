@@ -19,13 +19,13 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173/projects/new`. Vite binds to `127.0.0.1` by default, so the development server is local to the current computer.
+Open `http://localhost:5173/library` for the local project library. Start with the [project library guide](project-library.md) for reviewed imports, saved drafts, checkpoints, and recovery. The phrase-editing workflow below uses `/legacy/projects/new`. Vite binds to localhost with a strict port; use `npm run dev -- --port 5174` if the default port is unavailable.
 
 ## 2. Import JPW-ABC
 
 The project studio accepts `.jpwabc`, `.abc`, and exported JSON project files.
 
-1. Open **New teaching project**.
+1. Open **Legacy editor** at `/legacy/projects/new`.
 2. Choose **Import** and select a JPW-ABC file.
 3. Check the detected encoding, phrase count, and diagnostics.
 4. Review title, artist, lyricist, composer, arranger, key/meter, and expression.

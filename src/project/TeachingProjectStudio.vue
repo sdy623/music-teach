@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { RouterLink } from "vue-router";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import {
   LETTER_SECTION_PRESETS,
   POP_SECTION_PRESETS,
@@ -19,6 +19,12 @@ import {
   deserializeTeachingProject,
   downloadTeachingProject
 } from "./projectExport";
+import {
+  createLocalProjectId,
+  loadCurrentTeachingProject,
+  loadTeachingProjectLocally,
+  saveTeachingProjectLocally
+} from "./projectStore";
 import SlidevJianpuPhrase from "./SlidevJianpuPhrase.vue";
 import { buildSongProgressSections } from "../slide/teachingPresentation";
 import type {
@@ -30,19 +36,19 @@ import type {
 } from "./types";
 import "./projectStudio.css";
 
-const DRAFT_KEY = "jpw-teaching-project:draft";
 type EditorMode = "phrases" | "sections";
+const route = useRoute();
+const router = useRouter();
 const projectTitle = ref("新建教学工程");
 const sourceLyrics = ref("");
-const project = ref<TeachingProject>(
-  createTeachingProject(projectTitle.value, sourceLyrics.value)
-);
+const project = ref<TeachingProject>(createBlankProject());
 const selectedIndex = ref(0);
 const splitOffsets = ref<Record<string, number>>({});
 const editorMode = ref<EditorMode>("phrases");
 const importInput = ref<HTMLInputElement>();
 const importError = ref("");
 const importStatus = ref("");
+const saveStatus = ref("已在本机自动保存");
 const customSectionName = ref("");
 
 const selectedPhrase = computed(
@@ -79,6 +85,15 @@ const projectProgressSections = computed(() =>
     sectionLabel
   )
 );
+
+function createBlankProject(): TeachingProject {
+  const blank = createTeachingProject(projectTitle.value, sourceLyrics.value);
+  return { ...blank, id: createLocalProjectId(blank.title) };
+}
+
+function routeParamText(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
 
 function sectionLabel(section: string | undefined): string {
   return sectionPresets.value.find(
@@ -139,10 +154,20 @@ function deleteSectionBreak(phraseId: string): void {
 }
 
 function rebuildFromLyrics(): void {
-  project.value = createTeachingProject(
-    projectTitle.value,
-    sourceLyrics.value
-  );
+  const rebuilt = createTeachingProject(project.value.title, sourceLyrics.value);
+  project.value = {
+    ...rebuilt,
+    id: project.value.id,
+    tags: [...project.value.tags],
+    artist: project.value.artist,
+    lyricist: project.value.lyricist,
+    composer: project.value.composer,
+    arranger: project.value.arranger,
+    otherCredits: project.value.otherCredits,
+    keyAndMeters: project.value.keyAndMeters,
+    expression: project.value.expression,
+    customSections: [...project.value.customSections]
+  };
   selectedIndex.value = 0;
 }
 
@@ -326,7 +351,16 @@ function splitSelectedPhrase(): void {
 }
 
 function exportProject(): void {
+  persistCurrentProject();
   downloadTeachingProject(project.value);
+}
+
+function openProjectPlayer(): void {
+  persistCurrentProject();
+  void router.push({
+    name: "project-phrase",
+    params: { projectId: project.value.id, phraseIndex: 0 }
+  });
 }
 
 function openProjectImport(): void {
@@ -370,23 +404,42 @@ async function importProject(event: Event): Promise<void> {
   }
 }
 
-function persistDraft(): void {
-  window.localStorage.setItem(DRAFT_KEY, JSON.stringify(project.value));
+function persistCurrentProject(): void {
+  const result = saveTeachingProjectLocally(project.value);
+  saveStatus.value = result.ok
+    ? "已在本机自动保存"
+    : `自动保存失败：${result.error ?? "浏览器拒绝写入"}`;
 }
 
 onMounted(() => {
-  const saved = window.localStorage.getItem(DRAFT_KEY);
-  if (!saved) return;
-  try {
-    project.value = deserializeTeachingProject(saved);
+  const routeProjectId = routeParamText(route.params.projectId);
+  const saved = routeProjectId
+    ? loadTeachingProjectLocally(routeProjectId)
+    : loadCurrentTeachingProject();
+  if (saved) {
+    project.value = saved;
     projectTitle.value = project.value.title;
     sourceLyrics.value = project.value.sourceLyrics;
-  } catch {
-    window.localStorage.removeItem(DRAFT_KEY);
+  } else if (routeProjectId) {
+    importError.value = "未找到这个本机工程，已建立一个新的可恢复工程。";
   }
+  persistCurrentProject();
+  window.addEventListener("pagehide", persistCurrentProject);
 });
 
-watch(project, persistDraft, { deep: true });
+watch(
+  sourceLyrics,
+  (value) => {
+    if (project.value.sourceLyrics === value) return;
+    project.value = { ...project.value, sourceLyrics: value };
+  },
+  { flush: "sync" }
+);
+watch(project, persistCurrentProject, { deep: true, flush: "sync" });
+onBeforeUnmount(() => {
+  window.removeEventListener("pagehide", persistCurrentProject);
+  persistCurrentProject();
+});
 </script>
 
 <template>
@@ -397,12 +450,10 @@ watch(project, persistDraft, { deep: true });
         <h1>教学工程编辑器</h1>
       </div>
       <div class="project-header-actions">
-        <RouterLink
-          class="project-header-button"
-          :to="{ name: 'score', params: { scoreId: 'sakura' } }"
-        >
-          返回乐句播放器
-        </RouterLink>
+        <span class="project-save-status" role="status">{{ saveStatus }}</span>
+        <button class="project-header-button" type="button" @click="openProjectPlayer">
+          播放当前工程
+        </button>
         <input
           ref="importInput"
           class="project-file-input"

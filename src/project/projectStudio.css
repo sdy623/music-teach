@@ -42,6 +42,13 @@
   gap: 10px;
 }
 
+.project-header .project-save-status {
+  color: #8290a0;
+  font-family: var(--header-font-family);
+  font-size: 10px;
+  font-weight: 650;
+}
+
 .project-header a {
   color: #bdc8d3;
   font-size: 12px;

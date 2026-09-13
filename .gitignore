@@ -1,6 +1,10 @@
 node_modules/
 dist/
 dist-lib/
+dist-web/
+dist-webview/
+dist-cloudflare/
+dist-pages/
 artifacts/
 output/
 extracted_fonts/

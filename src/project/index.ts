@@ -22,7 +22,21 @@ export {
   migrateTeachingProject,
   serializeTeachingProject
 } from "./projectExport";
-export { restoreProjectPhraseSemantics } from "./projectPhraseSemantics";
+export {
+  buildRenderableProjectPhrase,
+  restoreProjectPhraseSemantics
+} from "./projectPhraseSemantics";
+export {
+  createLocalProjectId,
+  listStoredTeachingProjects,
+  loadCurrentTeachingProject,
+  loadTeachingProjectLocally,
+  saveTeachingProjectLocally
+} from "./projectStore";
+export type {
+  ProjectSaveResult,
+  StoredTeachingProjectSummary
+} from "./projectStore";
 export { default as SlidevJianpuPhrase } from "./SlidevJianpuPhrase.vue";
 export { default as JianpuTitleSlide } from "../slide/JianpuTitleSlide.vue";
 export { default as FullSongProgress } from "../slide/FullSongProgress.vue";

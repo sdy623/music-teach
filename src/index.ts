@@ -38,12 +38,17 @@ export {
   convertJPWABCToTeachingProject,
   convertParsedScoreToTeachingProject,
   createCustomSectionPreset,
+  createLocalProjectId,
   createTeachingProject,
   deserializeTeachingProject,
   downloadTeachingProject,
   migrateTeachingProject,
+  listStoredTeachingProjects,
+  loadCurrentTeachingProject,
+  loadTeachingProjectLocally,
   removeSectionBreak,
   restoreProjectPhraseSemantics,
+  saveTeachingProjectLocally,
   resolvePhraseSection,
   serializeTeachingProject,
   setSectionBreak,
@@ -64,5 +69,8 @@ export type {
   TeachingProjectKeyChange,
   TeachingProjectLyricCell,
   TeachingProjectPhrase,
-  TeachingSectionBreak
+  TeachingSectionBreak,
+  ProjectSaveResult,
+  StoredTeachingProjectSummary
 } from "./project";
+export * from "./neo";

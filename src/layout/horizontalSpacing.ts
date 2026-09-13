@@ -1,4 +1,5 @@
 import type { VoiceEvent } from "../ir/voice";
+import { PRINT_DASH_ADVANCE } from "../notation/notationProfiles";
 
 export function estimateEventWidth(event: VoiceEvent): number {
   switch (event.kind) {
@@ -7,8 +8,8 @@ export function estimateEventWidth(event: VoiceEvent): number {
     case "rhythm":
       return (
         3.0 +
-        event.duration.dashes * 2.8 +
-        event.duration.dots * 0.75 -
+        event.duration.dashes * PRINT_DASH_ADVANCE +
+        event.duration.dots * 0.95 -
         Math.min(event.duration.underlines, 2) * 0.15
       );
     case "barline":

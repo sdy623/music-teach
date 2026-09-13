@@ -17,10 +17,10 @@ import type {
 import {
   JPW_ACCIDENTAL_GLYPHS,
   JPW_DIGIT_GLYPHS,
-  JPW_DURATION_GLYPHS,
-  JPW_SCORE_GLYPH_HEIGHT,
   type VectorGlyph
 } from "./glyphs/jpwScoreGlyphs";
+import { horizontalStroke, octaveY, reductionY } from "../notation/engravingGeometry";
+import { PRINT_ENGRAVING, PRINT_GLYPH_SCALE, printAugmentation, printDigitInk } from "../notation/notationProfiles";
 
 defineProps<{
   page: PageLayout;
@@ -40,7 +40,7 @@ function durationLines(item: NoteItem | RestItem | RhythmItem): number[] {
 }
 
 function scoreGlyphScale(): number {
-  return (5.2 / JPW_SCORE_GLYPH_HEIGHT) * 0.5;
+  return PRINT_GLYPH_SCALE;
 }
 
 function noteDigitGlyph(item: NoteItem): VectorGlyph | undefined {
@@ -66,12 +66,13 @@ function accidentalTransform(item: NoteItem): string {
   return `translate(${item.x - 2.15} ${item.y - 0.15}) scale(${scoreGlyphScale()})`;
 }
 
-function dashTransform(item: NoteItem | RestItem | RhythmItem, dash: number): string {
-  return `translate(${item.x + 2.55 + dash * 2.35} ${item.y - 0.35}) scale(${scoreGlyphScale() * 1.7} ${scoreGlyphScale() * 2.15})`;
+function dashPath(item: NoteItem | RestItem | RhythmItem, dash: number): string {
+  return printAugmentation(item.x, item.y, dash, item.duration.dots).d;
 }
 
-function underlineTransform(item: NoteItem | RestItem | RhythmItem, line: number): string {
-  return `translate(${item.x} ${underlineY(item, line)}) scale(${scoreGlyphScale() * 1.65} ${scoreGlyphScale() * 2.2})`;
+function underlinePath(item: NoteItem | RestItem | RhythmItem, line: number): string {
+  const ink = printDigitInk(item.kind === "note" ? item.degree : undefined, item.x, item.y);
+  return horizontalStroke(ink.left, ink.right, reductionY(line + 1, item.y, PRINT_ENGRAVING), PRINT_ENGRAVING.lineWidth).d;
 }
 
 function dashes(item: NoteItem | RestItem | RhythmItem): number[] {
@@ -125,13 +126,6 @@ function keyLetterX(item: TitleKeyMeterItem): number {
   return item.x + (keyAccidentalGlyph(item) ? 7.25 : 0);
 }
 
-function underlineY(item: NoteItem | RestItem | RhythmItem, line: number): number {
-  if (item.kind === "note" && item.octave < 0) {
-    return item.y + 2.25 + Math.abs(item.octave) * 1.15 + line * 0.92;
-  }
-  return item.y + 1.55 + line * 0.92;
-}
-
 function itemClass(item: LayoutItem): string {
   const extra = "className" in item ? item.className : "";
   const lyricKind = item.kind === "lyric" ? item.lyricKind : "";
@@ -183,29 +177,27 @@ function itemClass(item: LayoutItem): string {
           :key="`oct-${dot}`"
           class="octave-dot"
           :cx="(item as NoteItem).x"
-          :cy="(item as NoteItem).y + ((item as NoteItem).octave > 0 ? -3.15 - dot * 1.1 : 1.75 + dot * 1.1)"
-          r="0.28"
+          :cy="octaveY(dot, (item as NoteItem).octave, (item as NoteItem).duration.underlines, item.y, PRINT_ENGRAVING)"
+          :r="PRINT_ENGRAVING.dotRadius"
         />
         <path
           v-for="line in durationLines(item as NoteItem)"
           :key="`u-${line}`"
           class="duration-path underline-path"
-          :d="JPW_DURATION_GLYPHS.underline.d"
-          :transform="underlineTransform(item as NoteItem, line)"
+          :d="underlinePath(item as NoteItem, line)"
         />
         <path
           v-for="dash in dashes(item as NoteItem)"
           :key="`d-${dash}`"
           class="duration-path dash-path"
-          :d="JPW_DURATION_GLYPHS.dash.d"
-          :transform="dashTransform(item as NoteItem, dash)"
+          :d="dashPath(item as NoteItem, dash)"
         />
         <circle
           v-for="dot in dots(item as NoteItem)"
           :key="`dot-${dot}`"
           class="duration-dot"
           :cx="(item as NoteItem).x + 1.85 + dot * 0.95"
-          :cy="(item as NoteItem).y - 0.65"
+          :cy="item.y + (PRINT_ENGRAVING.digitTop + PRINT_ENGRAVING.digitBottom) / 2"
           r="0.25"
         />
       </g>
@@ -229,22 +221,20 @@ function itemClass(item: LayoutItem): string {
           v-for="line in durationLines(item as RestItem | RhythmItem)"
           :key="`u-${line}`"
           class="duration-path underline-path"
-          :d="JPW_DURATION_GLYPHS.underline.d"
-          :transform="underlineTransform(item as RestItem | RhythmItem, line)"
+          :d="underlinePath(item as RestItem | RhythmItem, line)"
         />
         <path
           v-for="dash in dashes(item as RestItem | RhythmItem)"
           :key="`d-${dash}`"
           class="duration-path dash-path"
-          :d="JPW_DURATION_GLYPHS.dash.d"
-          :transform="dashTransform(item as RestItem | RhythmItem, dash)"
+          :d="dashPath(item as RestItem | RhythmItem, dash)"
         />
         <circle
           v-for="dot in dots(item as RestItem | RhythmItem)"
           :key="`dot-${dot}`"
           class="duration-dot"
           :cx="item.x + 1.85 + dot * 0.95"
-          :cy="item.y - 0.65"
+          :cy="item.y + (PRINT_ENGRAVING.digitTop + PRINT_ENGRAVING.digitBottom) / 2"
           r="0.25"
         />
       </g>
@@ -356,6 +346,8 @@ function itemClass(item: LayoutItem): string {
         v-else-if="item.kind === 'beam'"
         :class="itemClass(item)"
         :d="(item as BeamItem).d"
+        :data-level="(item as BeamItem).level"
+        :data-event-ids="(item as BeamItem).eventIds?.join(' ')"
         fill="currentColor"
       />
 
@@ -363,8 +355,12 @@ function itemClass(item: LayoutItem): string {
         v-else-if="item.kind === 'path'"
         :class="itemClass(item)"
         :d="(item as PathItem).d"
-        fill="none"
-        stroke="currentColor"
+        :fill="(item as PathItem).filled ? 'currentColor' : 'none'"
+        :stroke="(item as PathItem).filled ? 'none' : 'currentColor'"
+        :data-curve-id="(item as PathItem).curveId"
+        :data-curve-mode="(item as PathItem).curveMode"
+        :data-continued-left="(item as PathItem).continuedLeft"
+        :data-continued-right="(item as PathItem).continuedRight"
         :stroke-width="(item as PathItem).strokeWidth"
       />
 

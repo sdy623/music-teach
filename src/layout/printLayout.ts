@@ -1,11 +1,15 @@
 import type { ScoreIR } from "../ir/score";
 import type { LyricCell } from "../ir/lyric";
-import type { DurationIR, VoiceEvent } from "../ir/voice";
+import type { VoiceEvent } from "../ir/voice";
 import type { BeamItem, LayoutAnchor, NoteItem, PageLayout, PrintLayout, RestItem, RhythmItem } from "./types";
 import { A4_HEIGHT_MM, A4_WIDTH_MM, LAYOUT } from "./constants";
 import { estimateEventWidth } from "./horizontalSpacing";
 import { breakMeasuresIntoLines } from "./lineBreaker";
 import { buildLayoutMeasures } from "./measureBuilder";
+import { buildEventTiming } from "../notation/eventTiming";
+import { locateBeat } from "../notation/jianpuRules";
+import { contiguousBeamRuns, engravedCurve, horizontalStroke, notationTop, reductionY, type EngravedCurve } from "../notation/engravingGeometry";
+import { PRINT_ENGRAVING, printDigitInk } from "../notation/notationProfiles";
 import { displayTitleText, parseKeyAndMeterMarks, parseTempoExpression, type KeyMeterMark } from "../parser/parseTitle";
 
 export interface LayoutOptions {
@@ -33,7 +37,7 @@ export function buildPrintLayout(score: ScoreIR, options: LayoutOptions = {}): P
   const lines = breakMeasuresIntoLines(measures, lineWidth);
   const lyricByEvent = buildLyricMap(score);
   const placedAnchors: LayoutAnchor[] = [];
-  const beatMap = buildBeatMap(voice.events);
+  const beatMap = buildBeatMap(score);
   const beamCandidates: BeamCandidate[] = [];
 
   addTitleBlock(pages[0]!, score);
@@ -63,7 +67,7 @@ export function buildPrintLayout(score: ScoreIR, options: LayoutOptions = {}): P
           x += gapBeforeEvent(event, previousBeatGroupId, beatInfo?.groupId) + stretch;
         }
         const item = addEventItem(page, event, x, y, options, beatInfo);
-        if (item && (item.kind === "note" || item.kind === "rest" || item.kind === "rhythm") && item.duration.underlines > 0 && item.beatGroupId) {
+        if (item && item.beatGroupId) {
           beamCandidates.push({ page, item });
         }
         anchors.set(event.id, {
@@ -111,7 +115,7 @@ export function buildPrintLayout(score: ScoreIR, options: LayoutOptions = {}): P
   }
 
   addBeatBeams(beamCandidates);
-  addSlurItems(score, pages, anchors);
+  addSlurItems(score, beamCandidates);
   addAttachmentItems(score, pages, anchors, placedAnchors, options);
   addReadingOverrideItems(score, pages, anchors, options);
 
@@ -404,27 +408,55 @@ function buildLyricMap(score: ScoreIR): Map<string, LyricCell> {
   return map;
 }
 
-function addSlurItems(score: ScoreIR, pages: PageLayout[], anchors: Map<string, LayoutAnchor>): void {
-  for (const slur of score.semantic.slurs) {
-    const start = anchors.get(slur.startEventId);
-    const end = anchors.get(slur.endEventId);
-    if (!start || !end || start.pageNumber !== end.pageNumber) continue;
-    const page = pages[start.pageNumber - 1];
-    if (!page) continue;
-    const span = Math.max(1.8, end.x - start.x);
-    const y = Math.min(start.y, end.y) - 5.6;
-    const arch = Math.min(5, Math.max(2.2, span * 0.18));
-    const c1x = start.x + span / 3;
-    const c2x = start.x + (span * 2) / 3;
-    page.items.push({
-      id: `slur-${slur.id}`,
-      kind: "path",
-      x: 0,
-      y: 0,
-      d: `M ${start.x} ${y} C ${c1x} ${y - arch}, ${c2x} ${y - arch}, ${end.x} ${y}`,
-      strokeWidth: slur.type === "tie" ? 0.45 : 0.35,
-      className: slur.type
-    });
+function addSlurItems(score: ScoreIR, candidates: BeamCandidate[]): void {
+  const order = new Map(candidates.map((entry, index) => [entry.item.eventId, index]));
+  const placed = new Map<string, EngravedCurve[]>();
+  const curves = [...score.semantic.slurs].sort((a, b) =>
+    ((order.get(a.endEventId) ?? 0) - (order.get(a.startEventId) ?? 0)) -
+    ((order.get(b.endEventId) ?? 0) - (order.get(b.startEventId) ?? 0)));
+  for (const curve of curves) {
+    const start = order.get(curve.startEventId);
+    const end = order.get(curve.endEventId);
+    if (start === undefined || end === undefined || end <= start) continue;
+    const segments = new Map<string, BeamCandidate[]>();
+    for (const candidate of candidates.slice(start, end + 1)) {
+      const key = `${candidate.page.pageNumber}:${candidate.item.y}`;
+      const segment = segments.get(key) ?? [];
+      segment.push(candidate);
+      segments.set(key, segment);
+    }
+    let segmentIndex = 0;
+    for (const [key, segment] of segments) {
+      const first = segment[0]!;
+      const last = segment.at(-1)!;
+      const continuedLeft = first.item.eventId !== curve.startEventId;
+      const continuedRight = last.item.eventId !== curve.endEventId;
+      const x1 = first.item.x - (continuedLeft ? PRINT_ENGRAVING.em * 0.4 : 0);
+      const x2 = last.item.x + (continuedRight ? PRINT_ENGRAVING.em * 0.6 : 0);
+      let baseY = Math.min(...segment.map(({ item }) => notationTop(item.kind === "note" ? item.octave : 0,
+        item.y, PRINT_ENGRAVING))) - PRINT_ENGRAVING.aboveGap;
+      for (const lower of placed.get(key) ?? []) {
+        if (x1 < lower.x2 && x2 > lower.x1) baseY = Math.min(baseY, lower.apexY - PRINT_ENGRAVING.aboveGap);
+      }
+      const ink = engravedCurve(x1, x2, baseY, PRINT_ENGRAVING, {
+        type: curve.type === "tie" ? "tie" : "slur", noteCount: segment.filter(entry => entry.item.kind === "note").length,
+        continuedLeft, continuedRight
+      });
+      const row = placed.get(key) ?? [];
+      row.push(ink);
+      placed.set(key, row);
+      first.page.items.push({ id: `slur-${curve.id}-${segmentIndex++}`, kind: "path", x: 0, y: 0,
+        d: ink.d, strokeWidth: 0, filled: true, className: curve.type, curveId: curve.id,
+        curveMode: ink.mode, continuedLeft, continuedRight });
+      // A barline crossing the curve must stop below it, preserving its lower end.
+      for (const item of first.page.items) {
+        if (item.kind !== "barline" || item.x <= x1 || item.x >= x2 ||
+            Math.abs(item.y + item.height - (first.item.y - 7 + LAYOUT.barlineHeight)) > 0.001) continue;
+        const bottom = item.y + item.height;
+        item.y = Math.max(item.y, Math.min(bottom, baseY + PRINT_ENGRAVING.lineWidth));
+        item.height = bottom - item.y;
+      }
+    }
   }
 }
 
@@ -510,61 +542,23 @@ function gapBeforeEvent(event: VoiceEvent, previousBeatGroupId: string | undefin
   return previousBeatGroupId === currentBeatGroupId ? 0.35 : 2.6;
 }
 
-function buildBeatMap(events: VoiceEvent[]): Map<string, BeatInfo> {
+function buildBeatMap(score: ScoreIR): Map<string, BeatInfo> {
   const map = new Map<string, BeatInfo>();
-  let denominator = 4;
-  let currentMeasure = 0;
-  let beatIndex = 1;
-  let beatCursor = 0;
-
+  const events = score.voices[0]?.events ?? [];
+  const timing = buildEventTiming(events, score);
   for (const event of events) {
-    if (event.kind === "meter") {
-      denominator = event.denominator || 4;
-      continue;
-    }
-
-    const measure = event.measure ?? currentMeasure;
-    if (measure !== currentMeasure) {
-      currentMeasure = measure;
-      beatIndex = 1;
-      beatCursor = 0;
-    }
-
-    if (!isTimedEvent(event)) continue;
-
-    map.set(event.id, {
-      groupId: `${measure}:${beatIndex}`,
-      beatIndex
-    });
-
-    beatCursor += durationToQuarterUnits(event.duration);
-    const beatUnit = denominator === 8 ? 0.5 : 1;
-    while (beatCursor >= beatUnit - 0.0001) {
-      beatCursor -= beatUnit;
-      beatIndex += 1;
-    }
+    const position = timing.get(event.id);
+    if (!position) continue;
+    const beat = locateBeat(position.measureOffsetQuarter, position.numerator, position.denominator);
+    map.set(event.id, { groupId: `${event.measure}:${beat.index}`, beatIndex: beat.index });
   }
-
   return map;
-}
-
-function isTimedEvent(event: VoiceEvent): event is Extract<VoiceEvent, { kind: "note" | "rest" | "rhythm" }> {
-  return event.kind === "note" || event.kind === "rest" || event.kind === "rhythm";
-}
-
-function durationToQuarterUnits(duration: DurationIR): number {
-  const base = 1 / 2 ** duration.underlines;
-  let dots = 0;
-  for (let index = 0; index < duration.dots; index += 1) {
-    dots += base / 2 ** (index + 1);
-  }
-  return base + dots + duration.dashes * base;
 }
 
 function addBeatBeams(candidates: BeamCandidate[]): void {
   const groups = new Map<string, BeamCandidate[]>();
   for (const candidate of candidates) {
-    const key = `${candidate.page.pageNumber}:${candidate.item.beatGroupId}`;
+    const key = `${candidate.page.pageNumber}:${candidate.item.y}:${candidate.item.beatGroupId}`;
     const group = groups.get(key) ?? [];
     group.push(candidate);
     groups.set(key, group);
@@ -573,34 +567,23 @@ function addBeatBeams(candidates: BeamCandidate[]): void {
   for (const group of groups.values()) {
     const maxUnderlines = Math.max(...group.map((candidate) => candidate.item.duration.underlines));
     for (let level = 0; level < maxUnderlines; level += 1) {
-      const levelItems = group.filter((candidate) => candidate.item.duration.underlines > level);
-      if (levelItems.length < 2) continue;
-
-      for (const candidate of levelItems) {
-        candidate.item.beamedUnderlineLevels = [...(candidate.item.beamedUnderlineLevels ?? []), level];
-      }
-
-      const page = levelItems[0]!.page;
-      const y = Math.max(...levelItems.map((candidate) => underlineYForLayout(candidate.item, level)));
-      const x1 = Math.min(...levelItems.map((candidate) => candidate.item.x)) - 1.55;
-      const x2 = Math.max(...levelItems.map((candidate) => candidate.item.x)) + 1.55;
-      const thickness = 0.34;
-      const beam: BeamItem = {
-        id: `beam-${page.pageNumber}-${levelItems[0]!.item.beatGroupId}-${level}`,
-        kind: "beam",
-        x: x1,
-        y,
-        d: `M ${x1} ${y - thickness} L ${x2} ${y - thickness} L ${x2} ${y} L ${x1} ${y} Z`,
-        className: "duration-beam"
-      };
-      page.items.push(beam);
+      const runs = contiguousBeamRuns(group, level + 1, candidate => candidate.item.duration.underlines);
+      runs.forEach((run, runIndex) => {
+        for (const candidate of run) {
+          candidate.item.beamedUnderlineLevels = [...(candidate.item.beamedUnderlineLevels ?? []), level];
+        }
+        const first = run[0]!;
+        const last = run.at(-1)!;
+        const left = printDigitInk(first.item.kind === "note" ? first.item.degree : undefined, first.item.x, first.item.y).left;
+        const right = printDigitInk(last.item.kind === "note" ? last.item.degree : undefined, last.item.x, last.item.y).right;
+        const stroke = horizontalStroke(left, right, reductionY(level + 1, first.item.y, PRINT_ENGRAVING), PRINT_ENGRAVING.lineWidth);
+        const beam: BeamItem = {
+          id: `beam-${first.page.pageNumber}-${first.item.y}-${first.item.beatGroupId}-${level}-${runIndex}`,
+          kind: "beam", x: left, y: stroke.y, d: stroke.d, className: "duration-beam", level: level + 1,
+          eventIds: run.flatMap(candidate => candidate.item.eventId ? [candidate.item.eventId] : [])
+        };
+        first.page.items.push(beam);
+      });
     }
   }
-}
-
-function underlineYForLayout(item: NoteItem | RestItem | RhythmItem, line: number): number {
-  if (item.kind === "note" && item.octave < 0) {
-    return item.y + 2.25 + Math.abs(item.octave) * 1.15 + line * 0.92;
-  }
-  return item.y + 1.55 + line * 0.92;
 }
