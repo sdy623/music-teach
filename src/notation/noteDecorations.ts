@@ -51,7 +51,9 @@ function graceMetrics(style: EngravingStyle, print: boolean): GraceMetrics {
 }
 
 function graceNotes(notes: readonly GraceNoteIR[]): GraceNote[] {
-  return notes.map(note => ({ digit: String(note.degree), octave: note.octave, duration: 8, alter: note.accidental }));
+  // JPW brace grace notes use two reduction beams. This is the visual
+  // duration supplied to the geometry helper, not extra playback time.
+  return notes.map(note => ({ digit: String(note.degree), octave: note.octave, duration: 16, alter: note.accidental }));
 }
 
 export function graceLead(notes: readonly GraceNoteIR[] = [], em: number, print = false): number {

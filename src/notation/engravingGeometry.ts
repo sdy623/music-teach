@@ -105,8 +105,9 @@ export function horizontalStroke(x1: number, x2: number, y: number, thickness: n
 
 /** An extension is a separate beat cell, with its stroke centred on the digit's ink. */
 export function augmentationStroke(centerX: number, baseline: number, style: EngravingStyle, width = style.em * 0.5): EngravedLine {
+  // A duration dash needs numeral-like weight, independent of thin reduction beams.
   return horizontalStroke(centerX - width / 2, centerX + width / 2,
-    baseline + (style.digitTop + style.digitBottom) / 2, style.lineWidth);
+    baseline + (style.digitTop + style.digitBottom) / 2, style.em / 10);
 }
 
 /** Include zero-level entries: filtering them out first would bridge unrelated subdivisions. */

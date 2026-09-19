@@ -68,6 +68,25 @@ describe("jpeditor notation semantics", () => {
     expect(parsed.diagnostics).toHaveLength(2);
   });
 
+  it.each(["{5g}6g--- |", "{567g}6g--- |"])("renders JPW grace notes with two continuous beams in both views: %s", voice => {
+    const parsed = score(voice, "あ");
+    const frame = buildLessonDeck(parsed).phrases[0]!;
+    const phrase = mount(JianpuPhraseNotation, { props: { phrase: frame } });
+    const print = mount(SvgPage, { props: { page: buildPrintLayout(parsed).pages[0]! } });
+    for (const wrapper of [phrase, print]) {
+      const beams = wrapper.findAll(".grace-beam");
+      expect(beams).toHaveLength(2);
+      expect(beams[1]!.attributes("x")).toBe(beams[0]!.attributes("x"));
+      expect(beams[1]!.attributes("width")).toBe(beams[0]!.attributes("width"));
+      const lowerY = Number(beams[1]!.attributes("y"));
+      expect(lowerY).toBeGreaterThan(Number(beams[0]!.attributes("y")) + Number(beams[0]!.attributes("height")));
+      const hookStart = wrapper.find(".grace-hook").attributes("d")!.match(/^M\s+[\d.-]+\s+([\d.-]+)/)!;
+      expect(Number(hookStart[1])).toBeGreaterThanOrEqual(lowerY);
+      wrapper.unmount();
+    }
+    expect([...buildEventTiming(parsed.voices[0]!.events, parsed).values()].reduce((sum, event) => sum + event.durationQuarters, 0)).toBe(4);
+  });
+
   it.each(["{(3}1_ 2_ 3_)", "{(3}1 2 3)", "{(3}1__ 2__ 3__)"])("shares correct tuplet duration for %s", voice => {
     const parsed = score(`${voice} 4 |`, "あいうえ");
     const frame = buildLessonDeck(parsed).phrases[0]!;

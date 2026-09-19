@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- Render tuplets as JP-Word-style tapered arcs with centred SMuFL numerals. Use jpeditor's original grace-note geometry, including continuous beams, octave clearance and curved hooks, in teaching and print views.
+- Double the augmentation stroke weight in teaching and print views.
+
+- Render tuplets as JP-Word-style tapered arcs with centred SMuFL numerals. Use jpeditor's original grace-note geometry, including two continuous reduction beams, octave clearance and hooks below the lower beam, in teaching and print views.
 - Parse grace notes and staccato, mordent, fermata and accent marks without adding lyric slots or nominal playback time. Preserve existing numeral fonts.
 - Distinguish instrumental section parentheses from note slurs by their relationship to barlines, including nested slurs and tuplets. Enrich older saved score snapshots only in the display projection.
 - Show the total duration and bar count of every uninterrupted accompaniment run on each of its pages, accounting for each page's tempo and stopping at vocal or blank pages.
