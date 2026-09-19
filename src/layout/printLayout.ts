@@ -1,3 +1,5 @@
+import { notationProjection } from "../semantic/notationProjection";
+import { graceLead, noteDecorations, tupletArc } from "../notation/noteDecorations";
 import type { ScoreIR } from "../ir/score";
 import type { LyricCell } from "../ir/lyric";
 import type { VoiceEvent } from "../ir/voice";
@@ -8,7 +10,7 @@ import { breakMeasuresIntoLines } from "./lineBreaker";
 import { buildLayoutMeasures } from "./measureBuilder";
 import { buildEventTiming } from "../notation/eventTiming";
 import { locateBeat } from "../notation/jianpuRules";
-import { contiguousBeamRuns, engravedCurve, horizontalStroke, notationTop, reductionY, type EngravedCurve } from "../notation/engravingGeometry";
+import { contiguousBeamRuns, engravedCurve, horizontalStroke, reductionY, type EngravedCurve } from "../notation/engravingGeometry";
 import { PRINT_ENGRAVING, printDigitInk } from "../notation/notationProfiles";
 import { displayTitleText, parseKeyAndMeterMarks, parseTempoExpression, type KeyMeterMark } from "../parser/parseTitle";
 
@@ -29,6 +31,7 @@ interface BeamCandidate {
 }
 
 export function buildPrintLayout(score: ScoreIR, options: LayoutOptions = {}): PrintLayout {
+  score = notationProjection(score);
   const pages: PageLayout[] = [newPage(1)];
   const anchors = new Map<string, LayoutAnchor>();
   const voice = score.voices[0];
@@ -66,6 +69,8 @@ export function buildPrintLayout(score: ScoreIR, options: LayoutOptions = {}): P
         if (hasVisibleItem) {
           x += gapBeforeEvent(event, previousBeatGroupId, beatInfo?.groupId) + stretch;
         }
+        const lead = "graceNotes" in event ? graceLead(event.graceNotes, PRINT_ENGRAVING.em, true) : 0;
+        x += lead;
         const item = addEventItem(page, event, x, y, options, beatInfo);
         if (item && item.beatGroupId) {
           beamCandidates.push({ page, item });
@@ -105,7 +110,7 @@ export function buildPrintLayout(score: ScoreIR, options: LayoutOptions = {}): P
           });
         }
 
-        x += width;
+        x += width - lead;
         hasVisibleItem = true;
         previousBeatGroupId = beatInfo?.groupId;
       }
@@ -302,6 +307,8 @@ function addEventItem(page: PageLayout, event: VoiceEvent, x: number, y: number,
         accidental: event.accidental,
         octave: event.octave,
         duration: event.duration,
+        graceNotes: event.graceNotes,
+        ornaments: event.ornaments,
         beatGroupId: beatInfo?.groupId,
         visualRole: options.teachingGhost ? event.visualRole : "normal"
       };
@@ -318,6 +325,8 @@ function addEventItem(page: PageLayout, event: VoiceEvent, x: number, y: number,
         measure: event.measure,
         noteIndex: event.noteIndex,
         duration: event.duration,
+        graceNotes: event.graceNotes,
+        ornaments: event.ornaments,
         beatGroupId: beatInfo?.groupId
       };
       page.items.push(item);
@@ -333,6 +342,8 @@ function addEventItem(page: PageLayout, event: VoiceEvent, x: number, y: number,
         measure: event.measure,
         noteIndex: event.noteIndex,
         duration: event.duration,
+        graceNotes: event.graceNotes,
+        ornaments: event.ornaments,
         beatGroupId: beatInfo?.groupId
       };
       page.items.push(item);
@@ -412,6 +423,7 @@ function addSlurItems(score: ScoreIR, candidates: BeamCandidate[]): void {
   const order = new Map(candidates.map((entry, index) => [entry.item.eventId, index]));
   const placed = new Map<string, EngravedCurve[]>();
   const curves = [...score.semantic.slurs].sort((a, b) =>
+    Number(a.type === "tuplet") - Number(b.type === "tuplet") ||
     ((order.get(a.endEventId) ?? 0) - (order.get(a.startEventId) ?? 0)) -
     ((order.get(b.endEventId) ?? 0) - (order.get(b.startEventId) ?? 0)));
   for (const curve of curves) {
@@ -433,10 +445,22 @@ function addSlurItems(score: ScoreIR, candidates: BeamCandidate[]): void {
       const continuedRight = last.item.eventId !== curve.endEventId;
       const x1 = first.item.x - (continuedLeft ? PRINT_ENGRAVING.em * 0.4 : 0);
       const x2 = last.item.x + (continuedRight ? PRINT_ENGRAVING.em * 0.6 : 0);
-      let baseY = Math.min(...segment.map(({ item }) => notationTop(item.kind === "note" ? item.octave : 0,
-        item.y, PRINT_ENGRAVING))) - PRINT_ENGRAVING.aboveGap;
+      let baseY = Math.min(...segment.map(({ item }) => noteDecorations(item, item.x, item.y, PRINT_ENGRAVING, true).top)) - PRINT_ENGRAVING.aboveGap;
       for (const lower of placed.get(key) ?? []) {
         if (x1 < lower.x2 && x2 > lower.x1) baseY = Math.min(baseY, lower.apexY - PRINT_ENGRAVING.aboveGap);
+      }
+      if (curve.type === "tuplet") {
+        const arc = tupletArc(x1, x2, baseY, PRINT_ENGRAVING, curve.label, continuedLeft, continuedRight);
+        first.page.items.push({ id: `tuplet-${curve.id}-${segmentIndex}`, kind: "path", x: 0, y: 0,
+          d: arc.d, strokeWidth: 0, filled: true, className: "tuplet-arc", curveId: curve.id,
+          continuedLeft, continuedRight });
+        arc.labels.forEach((label, i) => first.page.items.push({ id: `tuplet-label-${curve.id}-${segmentIndex}-${i}`,
+          kind: "path", x: 0, y: 0, d: label.d, transform: label.transform, strokeWidth: 0, filled: true, className: "tuplet-label" }));
+        const row = placed.get(key) ?? [];
+        row.push({ x1, x2, baseY, apexY: arc.top, d: arc.d, mode: "flat" });
+        placed.set(key, row);
+        segmentIndex++;
+        continue;
       }
       const ink = engravedCurve(x1, x2, baseY, PRINT_ENGRAVING, {
         type: curve.type === "tie" ? "tie" : "slur", noteCount: segment.filter(entry => entry.item.kind === "note").length,

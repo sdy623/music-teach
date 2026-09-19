@@ -31,6 +31,7 @@ const props = withDefaults(
     showOpeningContext?: boolean;
     sectionLabel?: string;
     annotation?: string;
+    instrumentalRunCaption?: string;
     artist?: string;
     credits?: string | readonly string[];
     tags?: readonly string[];
@@ -69,7 +70,7 @@ const phraseProgress = computed(() => {
   if (props.phrase.slots.length <= 1 || props.activeSlot < 0) return 0;
   return Math.min(1, props.activeSlot / (props.phrase.slots.length - 1));
 });
-const instrumentalCaption = computed(() => formatInstrumentalCaption(props.phrase));
+const instrumentalCaption = computed(() => props.instrumentalRunCaption || props.phrase.instrumentalRunCaption || formatInstrumentalCaption(props.phrase));
 const originalSentence = computed(() =>
   props.phrase.teaching?.originalText ||
   props.phrase.teaching?.surface ||

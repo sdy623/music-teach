@@ -17,7 +17,7 @@ import {
   formatProjectCredits,
   resolvePhraseSection
 } from "./projectBuilder";
-import { buildRenderableProjectPhrase } from "./projectPhraseSemantics";
+import { buildRenderableProjectPhrase, projectInstrumentalRunCaption } from "./projectPhraseSemantics";
 import { loadTeachingProjectLocally } from "./projectStore";
 import SlidevJianpuPhrase from "./SlidevJianpuPhrase.vue";
 import type { TeachingProject } from "./types";
@@ -49,6 +49,7 @@ const phraseIndex = computed(() => {
   return /^\d+$/.test(raw) ? Number(raw) : 0;
 });
 const phrase = computed(() => project.value?.phrases[phraseIndex.value]);
+const instrumentalRunCaption = computed(() => projectInstrumentalRunCaption(project.value, phraseIndex.value));
 const credits = computed(() =>
   project.value ? formatProjectCredits(project.value) : ""
 );
@@ -315,6 +316,7 @@ onBeforeUnmount(stopPlayback);
         </div>
         <div class="slide-stage">
           <SlidevJianpuPhrase
+            :instrumental-run-caption="instrumentalRunCaption"
             v-if="phrase"
             :phrase="renderedPhrase"
             :kind="phrase.kind"

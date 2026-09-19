@@ -11,7 +11,7 @@ import {
   splitKeyOfOne,
   timeSignatureText
 } from "../notation/smufl";
-import { roundedTupletArcPaths } from "./curvePath";
+import NoteDecorations from "../render/NoteDecorations.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -262,14 +262,11 @@ function keyShiftText(semitoneShift: number | undefined): string {
 
     <g class="phrase-curves" aria-hidden="true">
       <g v-for="curve in geometry.curves" :key="curve.curve.id" :class="`curve-${curve.curve.type}`">
-        <template v-if="curve.curve.type === 'tuplet'">
-          <path
-            :d="roundedTupletArcPaths(curve)[0]"
-          />
-          <path
-            :d="roundedTupletArcPaths(curve)[1]"
-          />
-          <text :x="curve.centerX" :y="curve.labelY">{{ curve.curve.label ?? "3" }}</text>
+        <template v-if="curve.curve.type === 'tuplet' && curve.tuplet">
+          <path class="tuplet-arc" :d="curve.tuplet.d" fill="currentColor" style="stroke: none; fill: currentColor" />
+          <g class="tuplet-label" :aria-label="curve.curve.label ?? '3'">
+            <path v-for="(label, i) in curve.tuplet.labels" :key="i" :d="label.d" :transform="label.transform" fill="currentColor" style="stroke: none; fill: currentColor" />
+          </g>
         </template>
         <path
           v-else
@@ -306,6 +303,7 @@ function keyShiftText(semitoneShift: number | undefined): string {
           height="162"
         />
         <g class="phrase-slot-symbols" :style="{ opacity: slotOpacity(slotGeometry.slot, slotGeometry.index) }">
+          <NoteDecorations :note="slotGeometry.slot" :x="slotGeometry.symbolX" :y="geometry.noteY" :engraving="geometry.engraving" />
           <text
             v-if="accidentalText(slotGeometry.slot)"
             class="phrase-smufl phrase-accidental"

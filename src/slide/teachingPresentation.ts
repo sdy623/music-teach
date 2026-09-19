@@ -284,12 +284,26 @@ function plainRubyToken(text: string): TeachingRubyToken {
 
 /** Uses the same performed slots and tempo fallback as the phrase player. */
 export function formatInstrumentalCaption(phrase: Pick<JianpuPhraseFrame, "slots" | "tempo">): string {
-  const slots = phrase.slots.filter(isPerformedSlot);
-  const milliseconds = slots.reduce(
-    (total, slot) => total + slotDurationMilliseconds(slot, Number(phrase.tempo)),
-    0
-  );
-  const seconds = Math.round(milliseconds / 100) / 10;
-  const measures = new Set(slots.map((slot) => slot.measure)).size;
-  return `伴奏 ${seconds} 秒 · ${measures} 小节`;
+  return formatInstrumentalFrames([phrase]);
+}
+
+function formatInstrumentalFrames(frames: ReadonlyArray<Pick<JianpuPhraseFrame, "slots" | "tempo">>): string {
+  let milliseconds = 0;
+  let measures = 0;
+  for (const frame of frames) {
+    const slots = frame.slots.filter(isPerformedSlot);
+    milliseconds += slots.reduce((total, slot) => total + slotDurationMilliseconds(slot, Number(frame.tempo)), 0);
+    measures += new Set(slots.map(slot => slot.measure)).size;
+  }
+  return `伴奏 ${Math.round(milliseconds / 100) / 10} 秒 · ${measures} 小节`;
+}
+
+/** Contiguous instrumental pages belong to one run; vocal or blank pages end it.
+ * Each frame uses its own tempo. Round once after summing, never per page. */
+export function formatInstrumentalRunCaption(frames: readonly (JianpuPhraseFrame | undefined)[], index: number): string {
+  if (frames[index]?.kind !== "instrumental") return "";
+  let start = index, end = index;
+  while (start > 0 && frames[start - 1]?.kind === "instrumental") start--;
+  while (end + 1 < frames.length && frames[end + 1]?.kind === "instrumental") end++;
+  return formatInstrumentalFrames(frames.slice(start, end + 1).filter((frame): frame is JianpuPhraseFrame => Boolean(frame)));
 }

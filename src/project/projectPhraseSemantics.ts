@@ -7,6 +7,8 @@ import type {
 import { parseJPWABC } from "../parser/parseJPWABC";
 import { buildInstrumentalMeasureFrame, buildLessonDeck } from "../slide/buildLessonDeck";
 import { buildPhraseJPWABC } from "../teaching/lesson";
+import { formatInstrumentalRunCaption } from "../slide/teachingPresentation";
+import type { TeachingProject } from "./types";
 import type {
   MorphologyToken,
   TeachingPhraseKind,
@@ -175,4 +177,16 @@ function validSlot(
   return Number.isInteger(slotIndex) && slotIndex !== undefined && slotIndex >= 0
     ? slots[slotIndex]
     : undefined;
+}
+
+export function projectInstrumentalRunCaption(project: TeachingProject | undefined, index: number): string {
+  if (!project || project.phrases[index]?.kind !== "instrumental") return "";
+  let start = index, end = index;
+  while (start > 0 && project.phrases[start - 1]?.kind === "instrumental") start--;
+  while (end + 1 < project.phrases.length && project.phrases[end + 1]?.kind === "instrumental") end++;
+  const frames = project.phrases.slice(start, end + 1).map(phrase => buildRenderableProjectPhrase({
+    ...phrase, phrase: phrase.frame, title: project.title,
+    keyAndMeters: project.keyAndMeters, expression: project.expression
+  }));
+  return formatInstrumentalRunCaption(frames, index - start);
 }

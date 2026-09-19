@@ -25,6 +25,7 @@ import {
   loadTeachingProjectLocally,
   saveTeachingProjectLocally
 } from "./projectStore";
+import { projectInstrumentalRunCaption } from "./projectPhraseSemantics";
 import SlidevJianpuPhrase from "./SlidevJianpuPhrase.vue";
 import { buildSongProgressSections } from "../slide/teachingPresentation";
 import type {
@@ -55,6 +56,7 @@ const customSectionName = ref("");
 const selectedPhrase = computed(
   () => project.value.phrases[selectedIndex.value]
 );
+const instrumentalRunCaption = computed(() => projectInstrumentalRunCaption(project.value, selectedIndex.value));
 const selectedSectionLabel = computed(() => {
   if (selectedPhrase.value?.kind === "instrumental") return "";
   return sectionLabel(resolvePhraseSection(project.value, selectedIndex.value));
@@ -595,6 +597,7 @@ onBeforeUnmount(() => {
       <section class="project-editor-pane">
         <div class="project-preview">
           <SlidevJianpuPhrase
+            :instrumental-run-caption="instrumentalRunCaption"
             v-if="selectedPhrase"
             :phrase="selectedPhrase.frame"
             :kind="selectedPhrase.kind"

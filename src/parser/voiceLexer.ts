@@ -2,6 +2,8 @@ import type { Diagnostic, WithDiagnostics } from "../core/diagnostics";
 import { warning } from "../core/diagnostics";
 import type {
   Accidental,
+  GraceNoteIR,
+  OrnamentIR,
   BarlineEvent,
   DurationIR,
   MeterEvent,
@@ -35,6 +37,12 @@ export function lexVoice(src: string): WithDiagnostics<VoiceEvent[]> {
     }
 
     if (ch === "{") {
+      const decorated = readDecoratedNote(src, i);
+      if (decorated) {
+        events.push(decorated.event);
+        i += decorated.raw.length;
+        continue;
+      }
       const brace = readBraced(src, i);
       const raw = brace.raw;
       const match = raw.match(/^\{\((\d+)\}$/);
@@ -251,6 +259,39 @@ function readNoteLike(src: string, position: number): { raw: string; event: Note
   }
 
   return null;
+}
+
+const ORNAMENTS: Record<string, OrnamentIR> = {
+  DunYin: "staccato", BoYin: "mordent", YanYin: "fermata", ZhongYin: "accent"
+};
+
+function readDecoratedNote(src: string, position: number) {
+  let cursor = position;
+  const graceNotes: GraceNoteIR[] = [];
+  const ornaments: OrnamentIR[] = [];
+  while (src[cursor] === "{") {
+    const match = src.slice(cursor).match(/^\{([^{}]+)\}/);
+    if (!match) break;
+    const names = match[1]!.split(",");
+    if (names.every(name => ORNAMENTS[name])) {
+      ornaments.push(...names.map(name => ORNAMENTS[name]!));
+    } else if (/^(?:(?:#b|#|b|n)?[0-7][',gd]*)+$/.test(match[1]!)) {
+      for (const g of match[1]!.matchAll(/(#b|#|b|n)?([0-7])([',gd]*)/g)) {
+        graceNotes.push({ raw: g[0], degree: Number(g[2]),
+          octave: [...g[3]!].reduce((n, c) => n + (c === "'" || c === "g" ? 1 : -1), 0),
+          ...(g[1] ? { accidental: (g[1] === "#" ? "sharp" : g[1] === "b" ? "flat" : "natural") as Accidental } : {}) });
+      }
+    } else break;
+    cursor += match[0].length;
+    while (/\s/.test(src[cursor] ?? "")) cursor++;
+  }
+  if (!graceNotes.length && !ornaments.length) return null;
+  const main = readNoteLike(src, cursor);
+  if (!main) return null;
+  const raw = src.slice(position, cursor + main.raw.length);
+  return { raw, event: { ...main.event, raw, position,
+    ...(graceNotes.length ? { graceNotes } : {}),
+    ...(ornaments.length ? { ornaments: [...new Set(ornaments)] } : {}) } };
 }
 
 function readDuration(src: string, position: number): { raw: string; value: DurationIR } {

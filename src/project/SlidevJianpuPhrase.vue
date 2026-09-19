@@ -38,6 +38,7 @@ const props = withDefaults(
     expression?: string;
     section?: string;
     annotation?: string;
+    instrumentalRunCaption?: string;
     activeSlot?: number;
     teachingGhost?: boolean;
     showMetronome?: boolean;
@@ -122,6 +123,7 @@ function forwardSlot(slot: PhraseSlot, index: number): void {
     :show-key-changes="showKeyChanges"
     :section-label="section"
     :annotation="annotation"
+    :instrumental-run-caption="instrumentalRunCaption"
     :artist="artist"
     :credits="credits"
     :tags="tags"

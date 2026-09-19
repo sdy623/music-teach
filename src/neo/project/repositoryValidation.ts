@@ -225,6 +225,13 @@ function event(value: unknown, path: string): void {
   const entry = shape(value, path, { id: identity, raw: text, kind: identity, position: nonnegativeInteger }, {
     measure: nonnegativeInteger, noteIndex: nonnegativeInteger
   });
+  if (["note", "rest", "rhythm"].includes(String(entry.kind))) {
+    shape(entry, path, {}, {
+      instrumental: boolean,
+      graceNotes: list((note, at) => shape(note, at, { raw: text, degree: oneOf(0, 1, 2, 3, 4, 5, 6, 7), octave: integer }, { accidental: oneOf("sharp", "flat", "natural") })),
+      ornaments: list(oneOf("staccato", "mordent", "fermata", "accent"))
+    });
+  }
   switch (entry.kind) {
     case "note":
       shape(entry, path, {
@@ -302,7 +309,7 @@ function semantic(value: unknown, path: string): void {
   shape(value, path, {
     slurs: list((entry, at) => shape(entry, at, {
       id: identity, type: oneOf("slur", "tie", "tuplet"), startEventId: identity, endEventId: identity
-    })),
+    }, { label: text })),
     keyChanges: list((entry, at) => shape(entry, at, {
       id: identity, source: oneOf("attachment-text", "standard-text"), keyOfOne: text,
       anchor: attachmentAnchor, display: text

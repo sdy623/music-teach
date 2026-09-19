@@ -1,3 +1,5 @@
+import { graceLead } from "../notation/noteDecorations";
+import { PRINT_ENGRAVING } from "../notation/notationProfiles";
 import type { VoiceEvent } from "../ir/voice";
 import { PRINT_DASH_ADVANCE } from "../notation/notationProfiles";
 
@@ -7,7 +9,7 @@ export function estimateEventWidth(event: VoiceEvent): number {
     case "rest":
     case "rhythm":
       return (
-        3.0 +
+        3.0 + graceLead(event.graceNotes, PRINT_ENGRAVING.em, true) +
         event.duration.dashes * PRINT_DASH_ADVANCE +
         event.duration.dots * 0.95 -
         Math.min(event.duration.underlines, 2) * 0.15

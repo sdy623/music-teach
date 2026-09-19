@@ -1,4 +1,4 @@
-import type { Accidental, BarlineEvent } from "../ir/voice";
+import type { Accidental, BarlineEvent, NoteDecorationsIR } from "../ir/voice";
 import type { Diagnostic } from "../core/diagnostics";
 
 export type PhraseBreakStrength = 1 | 2 | 3;
@@ -25,7 +25,7 @@ export interface PhraseLyricCell {
 
 export type PhraseSlotKind = "note" | "rest" | "rhythm" | "sustain";
 
-export interface PhraseSlot {
+export interface PhraseSlot extends NoteDecorationsIR {
   id: string;
   eventId: string;
   sourceEventId: string;
@@ -146,6 +146,8 @@ export interface JianpuPhraseFrame {
   index: number;
   kind?: "vocal" | "instrumental";
   layoutDensity?: "normal" | "compact";
+  /** Derived by a complete timeline projection, never by the parser. */
+  instrumentalRunCaption?: string;
   sourceBlockId: string;
   title: string;
   subtitle?: string;

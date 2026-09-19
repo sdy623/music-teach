@@ -1,3 +1,4 @@
+import { graceLead, noteDecorations, tupletArc } from "../notation/noteDecorations";
 import type {
   JianpuPhraseFrame,
   PhraseCurve,
@@ -70,6 +71,7 @@ export interface CurveGeometry {
   apexY: number;
   labelY: number;
   d?: string;
+  tuplet?: ReturnType<typeof tupletArc>;
   mode?: "arc" | "flat";
 }
 
@@ -220,12 +222,9 @@ export function layoutPhrase(phrase: JianpuPhraseFrame, options: PhraseLayoutOpt
       const x2 = centerEnd;
       const spanSlots = slots.filter((slot) => slot.symbolX >= centerStart - 0.001 && slot.symbolX <= centerEnd + 0.001);
       const highestOctave = Math.max(0, ...spanSlots.map((slot) => Math.max(0, slot.slot.octave)));
-      const baseY = notationTop(highestOctave, JIANPU_METRICS.noteY, engraving) - engraving.aboveGap;
-      const width = Math.max(20, x2 - x1);
-      const minimumRise = curve.type === "tie" ? 11 : 14;
-      const maximumRise = curve.type === "tie" ? 19 : 27;
-      const rise = clamp(width * (curve.type === "tie" ? 0.055 : 0.075), minimumRise, maximumRise);
-      const apexY = curve.type === "tuplet" ? baseY - rise : engravedCurve(x1, x2, baseY, engraving,
+      const baseY = Math.min(notationTop(highestOctave, JIANPU_METRICS.noteY, engraving),
+        ...spanSlots.map(slot => noteDecorations(slot.slot, slot.symbolX, JIANPU_METRICS.noteY, engraving).top)) - engraving.aboveGap;
+      const apexY = curve.type === "tuplet" ? tupletArc(x1, x2, baseY, engraving, curve.label).top : engravedCurve(x1, x2, baseY, engraving,
         { type: curve.type, noteCount: spanSlots.filter(slot => slot.slot.kind !== "sustain").length }).apexY;
       return {
         curve,
@@ -239,7 +238,10 @@ export function layoutPhrase(phrase: JianpuPhraseFrame, options: PhraseLayoutOpt
     })
     .filter((curve): curve is CurveGeometry => Boolean(curve));
   const curves = stackCurveLanes(rawCurves, engraving).map((curve) => {
-    if (curve.curve.type === "tuplet") return curve;
+    if (curve.curve.type === "tuplet") {
+      const tuplet = tupletArc(curve.x1, curve.x2, curve.baseY, engraving, curve.curve.label);
+      return { ...curve, tuplet, apexY: tuplet.top };
+    }
     return { ...curve, ...engravedCurve(curve.x1, curve.x2, curve.baseY, engraving, {
       type: curve.curve.type, noteCount: slots.filter(slot => slot.slot.kind !== "sustain" &&
         slot.symbolX >= curve.x1 - 0.001 && slot.symbolX <= curve.x2 + 0.001).length
@@ -321,7 +323,7 @@ function beatNaturalWeight(slots: PhraseSlot[], durationQuarters: number): numbe
     (sum, slot) =>
       sum +
       (slot.kind === "sustain" ? 0.72 : 1) +
-      (slot.accidental ? 0.34 : 0) +
+      (slot.accidental ? 0.34 : 0) + graceLead(slot.graceNotes, 1) +
       Math.min(0.4, slot.dots * 0.16),
     0
   );
@@ -339,7 +341,7 @@ function resolveSlotCollisions(
   beat: BeatGeometry,
   compact: boolean
 ): PositionedSlot[] {
-  if (slots.length < 2) return slots;
+  if (!slots.length) return slots;
   const minimumGap = compact ? 2 : 4;
   const digitHalfWidth = compact ? 8 : JIANPU_METRICS.digitHalfWidth;
   const accidentalLead = compact ? 9 : 14;
@@ -349,7 +351,7 @@ function resolveSlotCollisions(
     const lyricLength = geometry.slot.lyricCell?.display.replace(/\s+/g, "").length ?? 0;
     const lyricHalfWidth = lyricLength * 13.5;
     const leftReserve = Math.max(
-      digitHalfWidth + (geometry.slot.accidental ? accidentalLead : 0),
+      digitHalfWidth + (geometry.slot.accidental ? accidentalLead : 0) + graceLead(geometry.slot.graceNotes, compact ? 24 : JIANPU_METRICS.digitFontSize),
       lyricHalfWidth
     );
     const rightReserve =
@@ -374,7 +376,7 @@ function resolveSlotCollisions(
   const first = slots[0]!;
   const firstLyricLength = first.slot.lyricCell?.display.replace(/\s+/g, "").length ?? 0;
   const firstReserve = Math.max(
-    digitHalfWidth + (first.slot.accidental ? accidentalLead : 0),
+    digitHalfWidth + (first.slot.accidental ? accidentalLead : 0) + graceLead(first.slot.graceNotes, compact ? 24 : JIANPU_METRICS.digitFontSize),
     firstLyricLength * 13.5
   );
   const leftOverflow = Math.max(0, beat.x - (first.x - firstReserve));
@@ -389,7 +391,7 @@ function resolveSlotCollisions(
 
 function stackCurveLanes(curves: CurveGeometry[], engraving: EngravingStyle): CurveGeometry[] {
   const placed: CurveGeometry[] = [];
-  for (const curve of [...curves].sort((a, b) => (a.x2 - a.x1) - (b.x2 - b.x1))) {
+  for (const curve of [...curves].sort((a, b) => Number(a.curve.type === "tuplet") - Number(b.curve.type === "tuplet") || (a.x2 - a.x1) - (b.x2 - b.x1))) {
     let baseY = curve.baseY;
     for (const previous of placed) {
       if (curve.x1 < previous.x2 && curve.x2 > previous.x1) {

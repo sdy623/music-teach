@@ -1,3 +1,4 @@
+import { collectVoiceTuplets } from "../semantic/voiceSpans";
 import type { ScoreIR } from "../ir/score";
 import type { LyricCell } from "../ir/lyric";
 import type { DurationIR, NoteEvent, RestEvent, RhythmEvent, TupletMarkerEvent, VoiceEvent } from "../ir/voice";
@@ -161,6 +162,7 @@ function buildConnectorAnnotations(score: ScoreIR, teachingGhost: boolean): Conn
   };
 
   score.semantic.slurs.forEach((curve) => {
+    if (curve.type === "tuplet") return;
     const spanEvents = eventsBetween(events, curve.startEventId, curve.endEventId);
     const spanNotes = spanEvents.filter((event): event is NoteEvent => event.kind === "note");
     if (spanNotes.length < 2) return;
@@ -206,6 +208,7 @@ function voiceToSparksFragments(
   let measureAtoms: TimedSparksAtom[] = [];
   let beatUnitQuartersValue = initialBeatUnitQuarters;
   let pendingTuplet: PendingTuplet | undefined;
+  const tupleEnds = new Set(collectVoiceTuplets(events).map(group => group.members.at(-1)!.id));
   let hasVisibleVoiceContent = false;
 
   const flush = () => {
@@ -232,6 +235,7 @@ function voiceToSparksFragments(
 
   const pushTimedEvent = (event: NoteEvent | RestEvent | RhythmEvent, core: string) => {
     hasVisibleVoiceContent = true;
+    if (event.graceNotes?.length || event.ornaments?.length) warnings.push("Sparks preview omits grace/ornament marks; use the score or teaching view.");
     if (!pendingTuplet) {
       measureAtoms.push(timedAtom(core, event.duration, connectorAnnotations.suffixes.get(event.id), connectorAnnotations.inserts.get(event.id)));
       return;
@@ -245,7 +249,7 @@ function voiceToSparksFragments(
     );
     pendingTuplet.atoms.push(atom);
     pendingTuplet.originalQuarters += durationQuarters(event.duration);
-    if (pendingTuplet.originalQuarters >= tupletWrittenQuarterTarget(pendingTuplet.marker.count) - 1e-6) {
+    if (tupleEnds.has(event.id)) {
       flushTuplet();
     }
   };
@@ -287,7 +291,6 @@ function voiceToSparksFragments(
         pendingTuplet = { marker: event, atoms: [], originalQuarters: 0 };
         break;
       case "slurMarker":
-        if (event.role === "end") flushTuplet();
         break;
       case "voltaMarker":
         break;
@@ -353,9 +356,6 @@ function tupletAtom(tuplet: PendingTuplet): TimedSparksAtom {
   };
 }
 
-function tupletWrittenQuarterTarget(count: number): number {
-  return count / 2;
-}
 
 function tupletRealDurationRatio(count: number): number {
   return count > 1 ? (count - 1) / count : 1;

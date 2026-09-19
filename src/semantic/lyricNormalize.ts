@@ -3,7 +3,7 @@ import type { VoiceEvent, VoiceIR } from "../ir/voice";
 
 export function buildLyricToNoteAlignment(voice: VoiceIR, blocks: LyricBlock[]): LyricAlignment[] {
   const slotEvents = voice.events.filter(isLyricSlotEvent);
-  const targets = slotEvents;
+  const targets = slotEvents.filter(event => !("instrumental" in event && event.instrumental));
   const alignments: LyricAlignment[] = [];
 
   for (const block of blocks) {

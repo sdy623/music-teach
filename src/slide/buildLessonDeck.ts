@@ -1,3 +1,4 @@
+import { notationProjection } from "../semantic/notationProjection";
 import type { ScoreIR } from "../ir/score";
 import type { LyricBlock, LyricCell } from "../ir/lyric";
 import type { BarlineEvent, MeterEvent, NoteEvent, RestEvent, RhythmEvent, VoiceEvent } from "../ir/voice";
@@ -6,8 +7,7 @@ import { buildEventTiming, type EventTiming } from "../notation/eventTiming";
 import {
   durationWithoutAugmentation,
   locateBeat,
-  meterBeatGroups,
-  totalDurationQuarters
+  meterBeatGroups
 } from "../notation/jianpuRules";
 import {
   displayTitleText,
@@ -68,6 +68,7 @@ interface PhraseDraft {
 const DEFAULT_METER = { numerator: 4, denominator: 4 };
 
 export function buildLessonDeck(score: ScoreIR, options: BuildLessonDeckOptions = {}): JianpuLessonDeck {
+  score = notationProjection(score);
   const voice = score.voices[0];
   const title = displayTitleText(score.title.title) || "Untitled";
   const subtitle = displayTitleText(score.title.subTitle2 || score.title.subTitle) || undefined;
@@ -119,6 +120,25 @@ export function buildLessonDeck(score: ScoreIR, options: BuildLessonDeckOptions 
         options.teachingByPhrase?.[index]
       )
     );
+  // Section parentheses surround complete measures; only these explicit spans
+  // create automatic instrumental pages, never an ordinary cross-bar slur.
+  const instrumentalMeasures = voice.measures.filter(measure => {
+    const timed = measure.events.filter(isSlotEvent);
+    return timed.length > 0 && timed.every(event => event.instrumental);
+  });
+  for (let i = 0; i < instrumentalMeasures.length;) {
+    const start = instrumentalMeasures[i]!.number;
+    let end = start;
+    while (++i < instrumentalMeasures.length && instrumentalMeasures[i]!.number === end + 1) end++;
+    for (let bar = start; bar <= end; bar += 4) {
+      const frame = buildInstrumentalMeasureFrame(score, bar, Math.min(end, bar + 3), 0);
+      if (frame) phrases.push(frame);
+    }
+  }
+  if (instrumentalMeasures.length) {
+    phrases.sort((a, b) => a.sourceAnchor.startMeasure - b.sourceAnchor.startMeasure || a.sourceAnchor.startNote - b.sourceAnchor.startNote);
+    phrases.forEach((phrase, index) => { phrase.index = index; });
+  }
   assignKeyChangesToPhrases(phrases, resolvedKeyChanges, voice.events);
 
   return {
@@ -146,6 +166,7 @@ export function buildInstrumentalMeasureFrame(
   index: number,
   options: InstrumentalMeasureFrameOptions = {}
 ): JianpuPhraseFrame | undefined {
+  score = notationProjection(score);
   const voice = score.voices[0];
   if (!voice || endMeasure < startMeasure) return undefined;
 
@@ -205,7 +226,7 @@ export function buildInstrumentalMeasureFrame(
     teaching: {
       surface: label,
       coachNote:
-        options.annotation ?? `原曲同步${label} · 连续 ${measureCount} 小节`
+        options.annotation ?? `原曲同步${label} · 本页 ${measureCount} 小节`
     }
   };
 
@@ -533,6 +554,9 @@ function splitLyricBlock(
   };
 
   for (const entry of aligned) {
+    const previous = current.at(-1)?.event;
+    if (previous && entry.event && events.some(event => isSlotEvent(event) && event.instrumental &&
+      event.position > previous.position && event.position < entry.event!.position)) flush(3);
     if (entry.cell.kind === "separator") {
       flush(Math.min(3, entry.cell.raw.length) as PhraseBreakStrength);
       continue;
@@ -617,13 +641,13 @@ function applyPhraseAnchors(
 
 function buildLyricTargets(events: VoiceEvent[]): LyricTarget[] {
   return events.flatMap((event): LyricTarget[] => {
-    if (!isSlotEvent(event)) return [];
+    if (!isSlotEvent(event) || event.instrumental) return [];
 
     const targets: LyricTarget[] = [
       {
         event,
         sustainIndex: 0,
-        acceptsSyllable: event.kind === "rest" ? false : event.lyricAlignable,
+        acceptsSyllable: !event.instrumental && (event.kind === "rest" ? false : event.lyricAlignable),
         acceptsExtension: event.kind !== "rest"
       }
     ];
@@ -724,7 +748,14 @@ function buildPhraseFrame(
 
 function resolveScoreKeyChanges(score: ScoreIR, events: VoiceEvent[]): ResolvedKeyChange[] {
   const slotEvents = events.filter(isSlotEvent);
-  const absoluteSymbolEvents = events.filter(isJPWAbsoluteSymbolEvent);
+  const absoluteSymbolEvents = events.flatMap(event => {
+    if (!isJPWAbsoluteSymbolEvent(event)) return [];
+    // Existing Text@@ anchors address lexical symbols, including a grace brace.
+    // Folding a prefix into its note must not shift later attachment indexes.
+    const prefixes = isSlotEvent(event) ? [...event.raw.matchAll(/\{[^{}]*\}/g)]
+      .filter(([raw]) => !/^\{(?:C:[^{}]*|YanYin|BaoChiYin)\}$/i.test(raw)).length : 0;
+    return Array.from({ length: prefixes + 1 }, () => event);
+  });
 
   const resolved = score.semantic.keyChanges
     .map((change): ResolvedKeyChange | undefined => {
@@ -916,6 +947,8 @@ function buildPhraseSlots(
       octave: event.kind === "note" ? event.octave : 0,
       underlines: duration?.underlines ?? 0,
       dots: duration?.dots ?? 0,
+      graceNotes: event.graceNotes,
+      ornaments: event.ornaments,
       attack: event.kind === "note" ? event.attack : event.kind === "rhythm",
       tieGhost: event.kind === "note" && event.visualRole === "tie-ghost",
       lyricCell: lyricBySlot.get(event.id)
@@ -942,6 +975,8 @@ function buildPhraseSlots(
         beatIndex: dashBeat.index,
         beatOffset: dashBeat.offset,
         durationBeats: eventTiming.durationScale / dashBeat.duration,
+        graceNotes: undefined,
+        ornaments: undefined,
         degree: undefined,
         accidental: undefined,
         octave: 0,
@@ -1100,55 +1135,7 @@ function buildPhraseCurves(score: ScoreIR, events: VoiceEvent[]): PhraseCurve[] 
     .filter((curve) => eventIds.has(curve.startEventId) && eventIds.has(curve.endEventId))
     .map((curve) => ({ ...curve }));
 
-  events.forEach((event, eventIndex) => {
-    if (event.kind !== "tupletMarker") return;
-    const tupleEvents = collectTupletEvents(events, eventIndex + 1, event.count);
-    const startEvent = tupleEvents[0];
-    const endEvent = tupleEvents[tupleEvents.length - 1];
-    if (!startEvent || !endEvent) return;
-    curves.push({
-      id: `tuplet-${event.id}`,
-      type: "tuplet",
-      startEventId: startEvent.id,
-      endEventId: endEvent.id,
-      label: String(event.count)
-    });
-  });
-
   return curves;
-}
-
-function collectTupletEvents(
-  events: VoiceEvent[],
-  startIndex: number,
-  count: number
-): Array<NoteEvent | RestEvent | RhythmEvent> {
-  const tupleEvents: Array<NoteEvent | RestEvent | RhythmEvent> = [];
-  let writtenQuarters = 0;
-  const target = tupletWrittenQuarterTarget(count);
-
-  for (let index = startIndex; index < events.length; index += 1) {
-    const event = events[index]!;
-    if (
-      event.kind === "barline" ||
-      event.kind === "meter" ||
-      event.kind === "return" ||
-      event.kind === "standardText" ||
-      (event.kind === "slurMarker" && event.role === "end")
-    ) {
-      break;
-    }
-    if (!isSlotEvent(event)) continue;
-    tupleEvents.push(event);
-    writtenQuarters += totalDurationQuarters(event.duration);
-    if (writtenQuarters >= target - 1e-6) break;
-  }
-
-  return tupleEvents;
-}
-
-function tupletWrittenQuarterTarget(count: number): number {
-  return count / 2;
 }
 
 function initialKeyMeter(score: ScoreIR): { keyOfOne: string; numerator: number; denominator: number } {

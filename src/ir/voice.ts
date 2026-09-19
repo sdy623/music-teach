@@ -6,6 +6,21 @@ export interface DurationIR {
 
 export type Accidental = "sharp" | "flat" | "natural";
 
+export type OrnamentIR = "staccato" | "mordent" | "fermata" | "accent";
+
+export interface GraceNoteIR {
+  raw: string;
+  degree: number;
+  octave: number;
+  accidental?: Accidental;
+}
+
+export interface NoteDecorationsIR {
+  graceNotes?: GraceNoteIR[];
+  ornaments?: OrnamentIR[];
+  instrumental?: boolean;
+}
+
 export interface BaseEvent {
   id: string;
   raw: string;
@@ -15,7 +30,7 @@ export interface BaseEvent {
   noteIndex?: number;
 }
 
-export interface NoteEvent extends BaseEvent {
+export interface NoteEvent extends BaseEvent, NoteDecorationsIR {
   kind: "note";
   degree: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   accidental?: Accidental;
@@ -29,14 +44,14 @@ export interface NoteEvent extends BaseEvent {
   visualRole?: "normal" | "tie-ghost";
 }
 
-export interface RestEvent extends BaseEvent {
+export interface RestEvent extends BaseEvent, NoteDecorationsIR {
   kind: "rest";
   duration: DurationIR;
   attack: false;
   lyricAlignable: false;
 }
 
-export interface RhythmEvent extends BaseEvent {
+export interface RhythmEvent extends BaseEvent, NoteDecorationsIR {
   kind: "rhythm";
   duration: DurationIR;
   pitchKey: null;

@@ -1,4 +1,4 @@
-import type { Accidental, BarlineEvent, DurationIR } from "../ir/voice";
+import type { Accidental, BarlineEvent, DurationIR, NoteDecorationsIR } from "../ir/voice";
 
 export interface PrintLayout {
   pages: PageLayout[];
@@ -74,7 +74,7 @@ export interface TempoItem extends BaseLayoutItem {
   className?: string;
 }
 
-export interface NoteItem extends BaseLayoutItem {
+export interface NoteItem extends BaseLayoutItem, NoteDecorationsIR {
   kind: "note";
   degree: number;
   accidental?: Accidental;
@@ -85,14 +85,14 @@ export interface NoteItem extends BaseLayoutItem {
   visualRole?: "normal" | "tie-ghost";
 }
 
-export interface RestItem extends BaseLayoutItem {
+export interface RestItem extends BaseLayoutItem, NoteDecorationsIR {
   kind: "rest";
   duration: DurationIR;
   beatGroupId?: string;
   beamedUnderlineLevels?: number[];
 }
 
-export interface RhythmItem extends BaseLayoutItem {
+export interface RhythmItem extends BaseLayoutItem, NoteDecorationsIR {
   kind: "rhythm";
   duration: DurationIR;
   beatGroupId?: string;
@@ -141,6 +141,7 @@ export interface PathItem extends BaseLayoutItem {
   filled?: boolean;
   curveId?: string;
   curveMode?: "arc" | "flat";
+  transform?: string;
   continuedLeft?: boolean;
   continuedRight?: boolean;
 }

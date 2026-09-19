@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NoteDecorations from "./NoteDecorations.vue";
 import type {
   AttachmentItem,
   BarlineItem,
@@ -154,6 +155,7 @@ function itemClass(item: LayoutItem): string {
         :data-measure="item.measure"
       >
         <title>{{ item.eventId }}</title>
+        <NoteDecorations :note="item" :x="item.x" :y="item.y" :engraving="PRINT_ENGRAVING" print />
         <path
           v-if="accidentalGlyph(item as NoteItem)"
           class="score-accidental-path"
@@ -209,6 +211,7 @@ function itemClass(item: LayoutItem): string {
         :data-measure="item.measure"
       >
         <title>{{ item.eventId }}</title>
+        <NoteDecorations :note="item" :x="item.x" :y="item.y" :engraving="PRINT_ENGRAVING" print />
         <path
           v-if="item.kind === 'rest' && restGlyph()"
           class="score-digit-path"
@@ -355,6 +358,7 @@ function itemClass(item: LayoutItem): string {
         v-else-if="item.kind === 'path'"
         :class="itemClass(item)"
         :d="(item as PathItem).d"
+        :transform="(item as PathItem).transform"
         :fill="(item as PathItem).filled ? 'currentColor' : 'none'"
         :stroke="(item as PathItem).filled ? 'none' : 'currentColor'"
         :data-curve-id="(item as PathItem).curveId"

@@ -11,7 +11,7 @@ import { buildLessonDeck } from "./buildLessonDeck";
 import JianpuLessonSlide from "./JianpuLessonSlide.vue";
 import JianpuTitleSlide from "./JianpuTitleSlide.vue";
 import type { JianpuLessonDeck, PhraseSlot } from "./types";
-import { buildSongProgressSections } from "./teachingPresentation";
+import { buildSongProgressSections, formatInstrumentalRunCaption } from "./teachingPresentation";
 import {
   findNextPlayablePhraseIndex,
   firstPerformedSlotIndex,
@@ -99,6 +99,7 @@ const timelineSlotPosition = computed({
     activeSlot.value = performedSlotIndexes.value[index] ?? -1;
   }
 });
+const instrumentalRunCaption = computed(() => formatInstrumentalRunCaption(deck.value?.phrases ?? [], phraseIndex.value));
 const phraseCountLabel = computed(() => {
   if (!deck.value?.phrases.length) return "0 / 0";
   if (isTitleSlide.value) return "TITLE";
@@ -625,6 +626,7 @@ onBeforeUnmount(stopPlayback);
             :tags="deck?.tags"
           />
           <JianpuLessonSlide
+            :instrumental-run-caption="instrumentalRunCaption"
             v-else-if="phrase"
             :phrase="phrase"
             :active-slot="activeSlot"

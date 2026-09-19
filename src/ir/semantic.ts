@@ -5,6 +5,7 @@ export interface SlurCurve {
   type: "slur" | "tie" | "tuplet";
   startEventId: string;
   endEventId: string;
+  label?: string;
 }
 
 export interface KeyChangeEvent {

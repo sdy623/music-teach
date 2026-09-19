@@ -1,3 +1,4 @@
+import { formatInstrumentalRunCaption } from "../../slide/teachingPresentation";
 import { cloneRepositoryJson } from "../project/repositoryValidation";
 import type { ProjectMetadata } from "../project/types";
 import { ImportService } from "./ImportService";
@@ -44,7 +45,9 @@ export class LibraryService {
       case "frame": {
         const document = this.opened?.project.id === command.id ? this.opened : await repository.get(command.id);
         if (document.project.revision !== command.revision) throw new LibraryError("conflict", "预览版本已改变，请重新打开。", document.project.revision);
-        return repository.frames(document)[command.index] ?? null;
+        const frames = repository.frames(document);
+        const frame = frames[command.index];
+        return frame ? { ...frame, instrumentalRunCaption: formatInstrumentalRunCaption(frames, command.index) } : null;
       }
       case "prepare": return this.imports.prepare(command.input);
       case "discard": this.imports.discard(); return null;
