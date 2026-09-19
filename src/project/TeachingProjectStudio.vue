@@ -35,6 +35,7 @@ import type {
   TeachingSectionBreak
 } from "./types";
 import "./projectStudio.css";
+import AppHeader from "../ui/AppHeader.vue";
 
 type EditorMode = "phrases" | "sections";
 const route = useRoute();
@@ -443,6 +444,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <AppHeader section="legacy" />
   <main class="project-studio">
     <header class="project-header">
       <div>

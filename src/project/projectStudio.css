@@ -1,12 +1,15 @@
+@import "../ui/theme.css";
+
 .project-studio {
-  --project-bg: #05080c;
-  --project-panel: #0a1017;
-  --project-panel-strong: #0d1721;
-  --project-line: rgb(255 255 255 / 13%);
-  --project-muted: #8290a0;
-  --project-text: #edf3f8;
-  --project-accent: #00a8e0;
-  min-height: 100vh;
+  --project-bg: var(--mt-bg);
+  --project-panel: var(--mt-panel);
+  --project-panel-strong: var(--mt-panel-strong);
+  --project-line: var(--mt-line);
+  --project-muted: var(--mt-muted);
+  --project-text: var(--mt-text);
+  --project-accent: var(--mt-accent);
+  min-height: calc(100vh - var(--mt-nav-height));
+  color-scheme: dark;
   background: var(--project-bg);
   color: var(--project-text);
   font-family: var(--header-font-family);
@@ -14,12 +17,12 @@
 
 .project-header {
   display: flex;
-  min-height: 82px;
+  min-height: 92px;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--project-line);
-  background: #050b11;
-  padding: 14px 26px;
+  background: var(--mt-header);
+  padding: 18px 28px;
 }
 
 .project-header span {
@@ -43,7 +46,7 @@
 }
 
 .project-header .project-save-status {
-  color: #8290a0;
+  color: var(--mt-muted);
   font-family: var(--header-font-family);
   font-size: 10px;
   font-weight: 650;
@@ -61,13 +64,13 @@
   align-items: center;
   border: 1px solid var(--project-line);
   border-radius: 4px;
-  background: #0a1520;
+  background: var(--mt-control);
   padding: 0 12px;
 }
 
 .project-header-button:hover {
-  border-color: #2c95bc;
-  background: #0c1c29;
+  border-color: var(--mt-focus);
+  background: var(--mt-hover);
   color: var(--project-text);
 }
 
@@ -104,15 +107,15 @@
   min-height: 34px;
   border: 1px solid var(--project-line);
   border-radius: 4px;
-  background: #0a1520;
+  background: var(--mt-control);
   color: var(--project-text);
   padding: 0 12px;
   cursor: pointer;
 }
 
 .project-studio button:hover:not(:disabled) {
-  border-color: #2c95bc;
-  background: #0c1c29;
+  border-color: var(--mt-focus);
+  background: var(--mt-hover);
 }
 
 .project-studio button:disabled {
@@ -177,7 +180,7 @@
   border: 1px solid var(--project-line);
   border-radius: 4px;
   outline: none;
-  background: #06101a;
+  background: var(--mt-field);
   color: var(--project-text);
   padding: 8px 9px;
 }
@@ -201,7 +204,7 @@
 
 .project-workspace {
   display: grid;
-  min-height: calc(100vh - 187px);
+  min-height: calc(100vh - var(--mt-nav-height) - 197px);
   grid-template-columns: 300px minmax(0, 1fr);
 }
 
@@ -223,12 +226,12 @@
   margin: 0 16px 14px;
   border-color: transparent !important;
   background: var(--project-accent) !important;
-  color: #00131d !important;
+  color: var(--mt-on-accent) !important;
   font-weight: 800 !important;
 }
 
 .project-phrase-list {
-  max-height: calc(100vh - 405px);
+  max-height: calc(100vh - var(--mt-nav-height) - 415px);
   overflow: auto;
   border-top: 1px solid var(--project-line);
 }
@@ -252,7 +255,7 @@
 
 .project-phrase-list button.is-selected {
   border-left-color: var(--project-accent);
-  background: #0b1824;
+  background: var(--mt-selected);
 }
 
 .project-phrase-list button > span {
@@ -362,7 +365,7 @@
 }
 
 .project-morphology b {
-  color: #edf3f8;
+  color: var(--mt-text);
   font-size: 13px;
 }
 
@@ -383,7 +386,7 @@
 
 .project-section-screen {
   width: min(100%, 1180px);
-  min-height: calc(100vh - 187px);
+  min-height: calc(100vh - var(--mt-nav-height) - 197px);
   margin: 0 auto;
   padding: 26px 28px 70px;
 }
@@ -532,7 +535,7 @@
 }
 
 .project-section-phrase:hover {
-  background: #0b1824 !important;
+  background: var(--mt-selected) !important;
 }
 
 .project-section-phrase > span {
@@ -606,4 +609,9 @@
   .project-section-phrase em {
     display: none;
   }
+}
+
+@media (max-width: 760px) {
+  .project-header { align-items: flex-start; flex-direction: column; gap: 14px; padding: 14px 18px; }
+  .project-header-actions { flex-wrap: wrap; }
 }

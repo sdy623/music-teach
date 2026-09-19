@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import "./slide.css";
+import AppHeader from "../ui/AppHeader.vue";
 import { decodeJPWABCWithInfo } from "../core/decode";
 import { demoFixtures, findFixture } from "../demo/fixtures";
 import { parseJPWABC } from "../parser/parseJPWABC";
@@ -506,6 +507,7 @@ onBeforeUnmount(stopPlayback);
 </script>
 
 <template>
+  <AppHeader section="teaching" />
   <main class="slide-studio">
     <header class="studio-header">
       <div>

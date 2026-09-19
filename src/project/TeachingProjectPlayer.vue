@@ -23,6 +23,7 @@ import SlidevJianpuPhrase from "./SlidevJianpuPhrase.vue";
 import type { TeachingProject } from "./types";
 import "../slide/slide.css";
 import "./projectPlayer.css";
+import AppHeader from "../ui/AppHeader.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -240,6 +241,7 @@ onBeforeUnmount(stopPlayback);
 </script>
 
 <template>
+  <AppHeader section="teaching" />
   <main class="slide-studio project-player">
     <header class="studio-header">
       <div>
@@ -256,7 +258,7 @@ onBeforeUnmount(stopPlayback);
           编辑当前工程
         </RouterLink>
         <RouterLink class="legacy-link" :to="{ name: 'project-new' }">
-          新建 / 导入工程
+          新建教学工程
         </RouterLink>
       </div>
     </header>

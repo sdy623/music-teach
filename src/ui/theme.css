@@ -1,0 +1,28 @@
+:root {
+  --mt-bg: #020408;
+  --mt-header: #050b12;
+  --mt-panel: #07101a;
+  --mt-panel-strong: #0a1420;
+  --mt-field: #06101a;
+  --mt-control: #0a1520;
+  --mt-hover: #0c1c29;
+  --mt-selected: #0b1824;
+  --mt-text: #f2f6fb;
+  --mt-secondary: #b9c5d2;
+  --mt-muted: #93a4b8;
+  --mt-line: rgb(255 255 255 / 14%);
+  --mt-line-soft: rgb(255 255 255 / 7%);
+  --mt-accent: #00a8e0;
+  --mt-accent-hover: #35bce9;
+  --mt-on-accent: #00131d;
+  --mt-focus: #2c95bc;
+  --mt-radius: 4px;
+  --mt-nav-height: 64px;
+}
+
+@media (max-width: 760px) {
+  :root { --mt-nav-height: 104px; }
+}
+
+/* The application chrome is dark; the teaching canvas remains print-like. */
+.jianpu-lesson-slide, .jianpu-title-slide { color-scheme: light; }

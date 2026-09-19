@@ -5,7 +5,7 @@
 
 .project-player-empty {
   display: grid;
-  min-height: calc(100vh - 92px);
+  min-height: calc(100vh - var(--mt-nav-height) - 92px);
   place-content: center;
   justify-items: center;
   gap: 12px;

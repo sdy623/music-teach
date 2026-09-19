@@ -1,3 +1,5 @@
+@import "../ui/theme.css";
+
 @font-face {
   font-family: "MusicTeachDigits";
   src: url("../../public/sparks-core-resources/font/noto_sans_display_extra_bold/noto_sans_display_extra_bold.ttf") format("truetype");
@@ -7,15 +9,16 @@
 }
 
 .slide-studio {
-  --studio-bg: #020408;
-  --studio-panel: #07101a;
-  --studio-panel-strong: #0a1420;
-  --studio-text: #f2f6fb;
-  --studio-muted: #8290a3;
-  --studio-divider: rgb(255 255 255 / 14%);
-  --studio-divider-soft: rgb(255 255 255 / 7%);
-  --studio-accent: #00a8e0;
-  min-height: 100vh;
+  --studio-bg: var(--mt-bg);
+  --studio-panel: var(--mt-panel);
+  --studio-panel-strong: var(--mt-panel-strong);
+  --studio-text: var(--mt-text);
+  --studio-muted: var(--mt-muted);
+  --studio-divider: var(--mt-line);
+  --studio-divider-soft: var(--mt-line-soft);
+  --studio-accent: var(--mt-accent);
+  min-height: calc(100vh - var(--mt-nav-height));
+  color-scheme: dark;
   background: var(--studio-bg);
   color: var(--studio-text);
   font-family: var(--header-font-family);
@@ -29,7 +32,7 @@
   gap: 24px;
   padding: 18px 28px;
   border-bottom: 1px solid var(--studio-divider);
-  background: #050b12;
+  background: var(--mt-header);
 }
 
 .studio-header h1,
@@ -63,8 +66,8 @@
   align-items: center;
   border: 1px solid var(--studio-divider);
   border-radius: 4px;
-  background: #0a1520;
-  color: #b9c5d2;
+  background: var(--mt-control);
+  color: var(--mt-secondary);
   padding: 0 12px;
   font-size: 12px;
   font-family: inherit;
@@ -78,12 +81,13 @@
 }
 
 .legacy-link:hover {
-  border-color: #2c95bc;
-  background: #0c1c29;
+  border-color: var(--mt-focus);
+  background: var(--mt-hover);
   color: #ffffff;
 }
 
 .studio-header-actions {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -119,7 +123,7 @@
   border: 1px solid var(--studio-divider);
   border-radius: 4px;
   outline: none;
-  background: #06101a;
+  background: var(--mt-field);
   color: var(--studio-text);
   padding: 0 28px 0 9px;
 }
@@ -147,7 +151,7 @@
   width: 34px;
   height: 34px;
   border: 0;
-  background: #06101a;
+  background: var(--mt-field);
   color: var(--studio-text);
   cursor: pointer;
   font-size: 20px;
@@ -168,12 +172,12 @@
 .play-button {
   border-radius: 4px;
   background: var(--studio-accent);
-  color: #00131d;
+  color: var(--mt-on-accent);
   font-size: 14px;
 }
 
 .play-button:hover {
-  background: #35bce9;
+  background: var(--mt-accent-hover);
 }
 
 .timeline-control {
@@ -191,15 +195,15 @@
 
 .studio-workspace {
   display: grid;
-  min-height: calc(100vh - 150px);
+  min-height: calc(100vh - var(--mt-nav-height) - 150px);
   grid-template-columns: 270px minmax(0, 1fr);
 }
 
 .phrase-list {
-  max-height: calc(100vh - 150px);
+  max-height: calc(100vh - var(--mt-nav-height) - 150px);
   overflow: auto;
   border-right: 1px solid var(--studio-divider);
-  background: #050b12;
+  background: var(--mt-header);
 }
 
 .phrase-list button {
@@ -221,12 +225,12 @@
 }
 
 .phrase-list button:hover {
-  background: #0a1420;
+  background: var(--mt-panel-strong);
 }
 
 .phrase-list button.is-selected {
   border-left-color: var(--studio-accent);
-  background: #0b1824;
+  background: var(--mt-selected);
 }
 
 .phrase-list button.is-instrumental {
@@ -323,7 +327,7 @@
   border: 1px solid var(--studio-divider);
   border-radius: 4px;
   outline: none;
-  background: #06101a;
+  background: var(--mt-field);
   color: var(--studio-text);
   font: inherit;
 }
@@ -358,7 +362,7 @@
 
 .score-section-map {
   width: min(100%, 1180px);
-  min-height: calc(100vh - 102px);
+  min-height: calc(100vh - var(--mt-nav-height) - 102px);
   margin: 0 auto;
   padding: 28px 28px 72px;
 }
@@ -398,7 +402,7 @@
   border: 1px solid var(--studio-divider);
   border-radius: 4px;
   outline: none;
-  background: #06101a;
+  background: var(--mt-field);
   color: var(--studio-text);
   padding: 0 9px;
   font: inherit;
@@ -532,7 +536,7 @@
 }
 
 .score-section-phrase:hover {
-  background: #0b1824 !important;
+  background: var(--mt-selected) !important;
 }
 
 .score-section-phrase > span {
@@ -1522,4 +1526,13 @@
   .score-section-phrase em {
     display: none;
   }
+}
+
+@media (max-width: 760px) {
+  .studio-header { align-items: flex-start; flex-direction: column; gap: 14px; }
+  .studio-header-actions { width: 100%; }
+  .studio-toolbar { padding-inline: 18px; }
+  .studio-toolbar label { flex-wrap: wrap; max-width: 100%; }
+  .studio-toolbar select { min-width: 0; max-width: 100%; }
+  .phrase-presentation-settings { grid-template-columns: minmax(0, 1fr); }
 }
