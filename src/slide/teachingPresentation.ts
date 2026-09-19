@@ -1,4 +1,6 @@
+import { isPerformedSlot, slotDurationMilliseconds } from "./playback";
 import type {
+  JianpuPhraseFrame,
   SongProgressSection,
   TeachingHighlightPalette,
   TeachingMark,
@@ -278,4 +280,16 @@ function containsHan(value: string): boolean {
 
 function plainRubyToken(text: string): TeachingRubyToken {
   return { id: "ruby-plain", surface: text, start: 0, end: text.length };
+}
+
+/** Uses the same performed slots and tempo fallback as the phrase player. */
+export function formatInstrumentalCaption(phrase: Pick<JianpuPhraseFrame, "slots" | "tempo">): string {
+  const slots = phrase.slots.filter(isPerformedSlot);
+  const milliseconds = slots.reduce(
+    (total, slot) => total + slotDurationMilliseconds(slot, Number(phrase.tempo)),
+    0
+  );
+  const seconds = Math.round(milliseconds / 100) / 10;
+  const measures = new Set(slots.map((slot) => slot.measure)).size;
+  return `伴奏 ${seconds} 秒 · ${measures} 小节`;
 }

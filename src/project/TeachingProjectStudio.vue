@@ -597,6 +597,7 @@ onBeforeUnmount(() => {
           <SlidevJianpuPhrase
             v-if="selectedPhrase"
             :phrase="selectedPhrase.frame"
+            :kind="selectedPhrase.kind"
             :voice-line="selectedPhrase.kind === 'blank' ? '' : selectedPhrase.voiceLine"
             :lyric-text="selectedPhrase.lyricText"
             :lyric-jpwabc="selectedPhrase.lyricJpwabc"

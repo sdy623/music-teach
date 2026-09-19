@@ -82,6 +82,7 @@ const renderedPhrase = computed(() => {
   }
   return buildRenderableProjectPhrase({
     phrase: currentPhrase.frame,
+    kind: currentPhrase.kind,
     voiceLine: currentPhrase.voiceLine,
     lyricText: currentPhrase.lyricText,
     lyricJpwabc: currentPhrase.lyricJpwabc,
@@ -316,6 +317,7 @@ onBeforeUnmount(stopPlayback);
           <SlidevJianpuPhrase
             v-if="phrase"
             :phrase="renderedPhrase"
+            :kind="phrase.kind"
             :voice-line="phrase.kind === 'blank' ? '' : phrase.voiceLine"
             :lyric-text="phrase.lyricText"
             :lyric-jpwabc="phrase.lyricJpwabc"

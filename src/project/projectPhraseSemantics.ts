@@ -5,15 +5,17 @@ import type {
   PhraseTeachingContent
 } from "../slide/types";
 import { parseJPWABC } from "../parser/parseJPWABC";
-import { buildLessonDeck } from "../slide/buildLessonDeck";
+import { buildInstrumentalMeasureFrame, buildLessonDeck } from "../slide/buildLessonDeck";
 import { buildPhraseJPWABC } from "../teaching/lesson";
 import type {
   MorphologyToken,
+  TeachingPhraseKind,
   TeachingProjectKeyChange,
   TeachingProjectLyricCell
 } from "./types";
 
 export interface RenderableProjectPhraseInput {
+  kind?: TeachingPhraseKind;
   phrase?: JianpuPhraseFrame;
   sourceText?: string;
   voiceLine?: string;
@@ -35,6 +37,7 @@ export interface RenderableProjectPhraseInput {
 export function buildRenderableProjectPhrase(
   input: RenderableProjectPhraseInput
 ): JianpuPhraseFrame | undefined {
+  if (input.kind === "blank") return undefined;
   const sourceText = input.sourceText?.trim()
     ? input.sourceText
     : input.voiceLine?.trim()
@@ -51,9 +54,11 @@ export function buildRenderableProjectPhrase(
   let base = input.phrase;
   if (!base && sourceText) {
     try {
-      base = buildLessonDeck(parseJPWABC(sourceText).value, {
-        id: "project-phrase"
-      }).phrases[0];
+      const score = parseJPWABC(sourceText).value;
+      const measures = score.voices[0]?.measures ?? [];
+      base = input.kind === "instrumental" && measures.length
+        ? buildInstrumentalMeasureFrame(score, measures[0]!.number, measures.at(-1)!.number, 0)
+        : buildLessonDeck(score, { id: "project-phrase" }).phrases[0];
     } catch {
       base = undefined;
     }
@@ -70,6 +75,10 @@ export function buildRenderableProjectPhrase(
   const morphology = input.morphology ?? [];
   return {
     ...base,
+    kind: input.kind ?? base.kind,
+    normalizedText: input.kind === "instrumental" && base.kind !== "instrumental"
+      ? "过门"
+      : base.normalizedText,
     index: input.phraseIndex ?? base.index,
     title: input.title || base.title,
     teaching: {

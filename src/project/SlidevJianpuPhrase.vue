@@ -11,6 +11,7 @@ import type {
 import { buildRenderableProjectPhrase } from "./projectPhraseSemantics";
 import type {
   MorphologyToken,
+  TeachingPhraseKind,
   TeachingProjectKeyChange,
   TeachingProjectLyricCell
 } from "./types";
@@ -19,6 +20,7 @@ import "./project.css";
 const props = withDefaults(
   defineProps<{
     phrase?: JianpuPhraseFrame;
+    kind?: TeachingPhraseKind;
     sourceText?: string;
     voiceLine?: string;
     lyricText?: string;
@@ -48,6 +50,7 @@ const props = withDefaults(
   }>(),
   {
     phrase: undefined,
+    kind: undefined,
     sourceText: "",
     voiceLine: "",
     lyricText: "",
@@ -83,6 +86,7 @@ const emit = defineEmits<{
 const renderedPhrase = computed<JianpuPhraseFrame | undefined>(() =>
   buildRenderableProjectPhrase({
     phrase: props.phrase,
+    kind: props.kind,
     sourceText: props.sourceText,
     voiceLine: props.voiceLine,
     lyricText: props.lyricText,

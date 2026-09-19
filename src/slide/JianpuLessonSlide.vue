@@ -4,6 +4,7 @@ import FullSongProgress from "./FullSongProgress.vue";
 import JianpuPhraseNotation from "./JianpuPhraseNotation.vue";
 import {
   buildTeachingRubyTokens,
+  formatInstrumentalCaption,
   DEFAULT_TEACHING_HIGHLIGHT_PALETTE,
   teachingSentenceFontSize
 } from "./teachingPresentation";
@@ -68,6 +69,7 @@ const phraseProgress = computed(() => {
   if (props.phrase.slots.length <= 1 || props.activeSlot < 0) return 0;
   return Math.min(1, props.activeSlot / (props.phrase.slots.length - 1));
 });
+const instrumentalCaption = computed(() => formatInstrumentalCaption(props.phrase));
 const originalSentence = computed(() =>
   props.phrase.teaching?.originalText ||
   props.phrase.teaching?.surface ||
@@ -263,7 +265,8 @@ onBeforeUnmount(() => {
       <section v-else class="lesson-interlude-band">
         <div>
           <span>ORIGINAL SONG SYNC</span>
-          <strong>{{ phrase.normalizedText || "过门" }} · {{ phrase.measures.length }} 小节</strong>
+          <strong>{{ phrase.normalizedText || "过门" }}</strong>
+          <small class="lesson-interlude-caption" title="按当前播放速度计算">{{ instrumentalCaption }}</small>
         </div>
         <p>{{ annotation || phrase.teaching?.coachNote || "保持拍点，等待下一句进入。" }}</p>
       </section>
